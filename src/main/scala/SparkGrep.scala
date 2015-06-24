@@ -52,7 +52,7 @@ object SparkGrep {
 
     /* train SVMs for genres */
     val models: Array[SVMModel] = Array()
-    for(i <- 0 to genreList.value.length) {
+    for(i <- 0 to genreList.value.length - 1) {
       models :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i)
     }
 
