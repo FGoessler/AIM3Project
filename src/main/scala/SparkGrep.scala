@@ -29,9 +29,9 @@ object SparkGrep {
     val inputFile = sc.textFile("genres.list", 2).cache().sample(withReplacement = false, 0.1, 5)   //TODO: remove sampling
     val moviesWithGenres = inputFile.map(line => {
       val s = line.split("\t+")
-      val genreVector = Vectors.dense(genreList.value.map(f => if (f == s(0)) 1.0 else 0.0))
+      val genreVector = Vectors.dense(genreList.value.map(f => if (f == s(1)) 1.0 else 0.0))
       (s(0), genreVector)
-    })
+    }).reduceByKey((v1, v2) => Vectors.dense(v1.toArray.toList.zip(v2.toArray).map(w => Math.min(1.0, w._1 + w._2)).toArray))
 
     /* create a list of all available movie titles */
     // TODO: maybe generate this from the plot description input cause there shouldn't be any duplicates
