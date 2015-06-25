@@ -51,17 +51,17 @@ object SparkGrep {
     /* ####################### TRAINING ####################### */
 
     /* train SVMs for genres */
-    val models: Array[SVMModel] = Array()
+    var modelsLocal: Seq[SVMModel] = Seq()
     for(i <- 0 to genreList.value.length - 1) {
-      models :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i)
+      modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i)
     }
-
+    val models = sc.broadcast(modelsLocal.toArray)
 
     /* ####################### TESTING ####################### */
 
     /* use trained models to predict genres of the test data */
     val res = moviesWithGenresAndTFIDFVector_test
-      .map(m => (m._1, m._2._1, generatePredictedGenreVector(m._2._2, models)))
+      .map(m => (m._1, m._2._1, generatePredictedGenreVector(m._2._2, models.value)))
 
 
 
