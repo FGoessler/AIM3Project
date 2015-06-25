@@ -103,14 +103,11 @@ object SparkGrep {
   def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int): SVMModel = {
     val trainingDataForGenre = trainingData.map(m => LabeledPoint(m._2._1(genreIndex), m._2._2))
     val model = SVMWithSGD.train(trainingDataForGenre, 100)
-    model.clearThreshold()
     model
   }
 
-  val predictionThreshold = 0.5
   def generatePredictedGenreVector(tfIDFVector: Vector, genreModels: Array[SVMModel]): Vector = {
     val prediction = genreModels.map(model => model.predict(tfIDFVector))
-    prediction.map(f => if (f > predictionThreshold) 1.0 else 0.0)
     Vectors.dense(prediction)
   }
 
