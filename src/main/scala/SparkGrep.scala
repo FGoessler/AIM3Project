@@ -3,6 +3,7 @@ package spark.example
 /* SimpleApp.scala */
 
 import org.apache.spark.mllib.classification.{SVMModel, SVMWithSGD}
+import org.apache.spark.mllib.feature.{IDF, HashingTF}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
@@ -20,10 +21,20 @@ object SparkGrep {
 
     /* read in plot descriptions */
     // TODO
+    val documents = sc.textFile("plot.list").cache().sample(withReplacement = false, 0.001, 5)
 
     /* calculate TF-IDF vectors */
     // TODO
+    val plotsWithLabel:RDD[(String,Seq[String])] = documents.map(line =>{
+      val s = line.split(":::")
+      (s(0),s(1).split(" ").toSeq)
+    })
+    val hashingTF = new HashingTF()
+    val tfWithLabel = plotsWithLabel.map(m => (m._1,hashingTF.transform(m._2)))
 
+    val tf = tfWithLabel.map(m => m._2)
+    val idf = new IDF().fit(tf)
+    val tfidfWithLabel = tfWithLabel.map(m => (m._1,idf.transform(m._2)))
 
     /* load movie to genre mapping */
     val inputFile = sc.textFile("genres.list", 2).cache().sample(withReplacement = false, 0.1, 5)   //TODO: remove sampling
