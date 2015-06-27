@@ -9,9 +9,10 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
 case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
+                  trainingPercentage: Double = 0.7,
                   plotsInputFile: String = "plot_normalized.list",
                   genresInputFile: String = "genres.list",
-                  outputFile: String = "",
+                  outputFile: Option[String] = None,
                   genres: Seq[String] = Seq("Comedy", "Drama"))
 
 object IMDbMovieClassification {
@@ -23,18 +24,31 @@ object IMDbMovieClassification {
     val parser = new scopt.OptionParser[Config]("") {
       head("IMDb Movie Classification")
       opt[Double]('s', "sampling") optional() action { (x, c) =>
-        c.copy(sampling = x) } text "input data sampling rate - default 1.0 (all)"
+        c.copy(sampling = x)
+      } validate { x =>
+        if (x > 0.0 && x <= 1.0) success else failure("Value <sampling> must be between 0.0 and 1.0")
+      } text "Input data sampling rate - default 1.0 (all)."
       opt[Int]('i', "svmIterations") optional() action { (x, c) =>
-        c.copy(svmIterations = x) } text "number of training iterations - default 100"
+        c.copy(svmIterations = x)
+      } text "Number of training iterations - default 100."
+      opt[Double]('t', "trainingPercentage") optional() action { (x, c) =>
+        c.copy(trainingPercentage = x)
+      } validate { x =>
+        if (x > 0.0 && x < 1.0) success else failure("Value <trainingPercentage> must be between 0.0 and 1.0")
+      } text "Percentage of data that should be used for training. Remaining part will be used for testing. Default 0.7."
       opt[String]('p', "plotsInputFile") optional() action { (x, c) =>
-        c.copy(plotsInputFile = x) } text "file with all plot descriptions - default plot_normalized.list"
+        c.copy(plotsInputFile = x)
+      } text "File with all plot descriptions - default 'plot_normalized.list'."
       opt[String]('g', "genresInputFile") optional() action { (x, c) =>
-        c.copy(genresInputFile = x) } text "file with all movie-genre mappings - default genres.list"
+        c.copy(genresInputFile = x)
+      } text "File with all movie-genre mappings - default 'genres.list'."
       opt[String]('o', "outputFile") optional() action { (x, c) =>
-        c.copy(outputFile = x) } text "output file path - default stdout"
-      opt[Seq[String]]("genres") valueName "<genre1>,<genre2>..." optional() action { (x,c) =>
-        c.copy(genres = x) } text "genres to classify - default all"
-      help("help") text "prints this usage text"
+        c.copy(outputFile = Some(x))
+      } text "Output file path - default stdout."
+      opt[Seq[String]]("genres") valueName "<genre1>,<genre2>..." optional() action { (x, c) =>
+        c.copy(genres = x)
+      } text "Genres to classify - default all."
+      help("help") text "Prints this usage text."
     }
 
     parser.parse(args, Config()) match {
@@ -106,8 +120,8 @@ object IMDbMovieClassification {
     /* join TF-IDF vectors with genres to get labeled data */
     val moviesWithGenresAndTFIDFVector = moviesWithGenres.join(moviesWithTFIDFVectors)
 
-    /* split data into training (70%) and test (30%) */
-    val splits = moviesWithGenresAndTFIDFVector.randomSplit(Array(0.7, 0.3), seed = 11L)
+    /* split data into training and test */
+    val splits = moviesWithGenresAndTFIDFVector.randomSplit(Array(config.trainingPercentage, 1.0 - config.trainingPercentage), seed = 11L)
     val moviesWithGenresAndTFIDFVector_training = splits(0).cache()
     val moviesWithGenresAndTFIDFVector_test = splits(1).cache()
 
@@ -149,8 +163,8 @@ object IMDbMovieClassification {
       val tooMuchPredicatedGenres = zipped.flatMap(v => if (v._1._1 < v._1._2) Seq(v._2) else Seq()).mkString(",")
       val correctlyPredictedGenres = zipped.flatMap(v => if ((v._1._1 == 1) && (v._1._2 == 1)) Seq(v._2) else Seq()).mkString(",")
 
-      logger.log(Level.INFO, "%s: correctly classified: [%s] | not classified: [%s] | too much classified: [%s]"
-        .format(m._1, correctlyPredictedGenres, notPredicatedGenres, tooMuchPredicatedGenres))
+      writeToFileOrStdout("%s: correctly classified: [%s] | not classified: [%s] | too much classified: [%s]"
+        .format(m._1, correctlyPredictedGenres, notPredicatedGenres, tooMuchPredicatedGenres), config.outputFile)
     })
 
     /* calculate error rate */
@@ -165,8 +179,8 @@ object IMDbMovieClassification {
 
     val errorPercentage = precision._1.toDouble / precision._2.toDouble
 
-    logger.log(Level.INFO, "%d wrong classifications, %d right classifications -> error rate of %f"
-      .format(precision._1, precision._2 - precision._1, errorPercentage))
+    writeToFileOrStdout("%d wrong classifications, %d right classifications -> error rate of %f"
+      .format(precision._1, precision._2 - precision._1, errorPercentage), config.outputFile)
   }
 
   def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int, numIterations: Int): SVMModel = {
@@ -180,4 +194,11 @@ object IMDbMovieClassification {
     Vectors.dense(prediction)
   }
 
+  def writeToFileOrStdout(text: String, fname: Option[String] = None) = {
+    val outStream = fname match{
+      case Some(name) => new java.io.FileOutputStream(new java.io.File(name))
+      case None => System.out
+    }
+    outStream.write(text.getBytes)
+  }
 }
