@@ -2,42 +2,60 @@ package spark.example
 
 /* SimpleApp.scala */
 
+import org.apache.log4j.{Level, Priority, Logger}
 import org.apache.spark.mllib.classification.{SVMModel, SVMWithSGD}
-import org.apache.spark.mllib.feature.{IDF, HashingTF}
+import org.apache.spark.mllib.feature.{HashingTF, IDF}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
 object SparkGrep {
+
+  val logger = Logger.getLogger("## IMDb Movie Classification ##")
+
   def main(args: Array[String]) {
-    val conf = new SparkConf().setAppName("SparkGrep").setMaster("local[*]")
+    val conf = new SparkConf()
+      .setAppName("SparkGrep")
+      .setMaster("local[*]")
     val sc = new SparkContext(conf)
 
     /* ####################### PREPROCESSING ####################### */
+
+    logger.log(Level.INFO, "Starting IMDb Movie Classification Task")
 
     /* predefined list of all genres that we analyze */
     val genreList = sc.broadcast(Array("Comedy", "Drama")) // TODO: add more genres
 
     /* read in plot descriptions */
-    val documents = sc.textFile("plot_normalized.list").cache().sample(withReplacement = false, 0.001, 5) //TODO: remove sampling
+    val documents = sc.textFile("plot_normalized.list").cache().sample(withReplacement = false, 0.1, 5) //TODO: remove sampling
     val plotsWithLabel = documents.map(line => {
         val s = line.split(":::")
         (s(0), s(1).split(" ").toSeq)
       })
 
+    logger.log(Level.INFO, "Finished read plot descriptions from file")
+
     /* create a list of all available movie titles */
     val movieTitles = plotsWithLabel.map(_._1).distinct()
+    logger.log(Level.INFO, "Using %d movies".format(movieTitles.count()))
 
     /* calculate TF-IDF vectors */
+    logger.log(Level.INFO, "Starting calculating TF")
     val hashingTF = new HashingTF()
     val tfWithLabel = plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
 
+    logger.log(Level.INFO, "Starting calculating IDF")
     val tf = tfWithLabel.map(m => m._2)
     val idf = new IDF().fit(tf) //TODO: transmit as a broadcast variable?
 
+    logger.log(Level.INFO, "Starting calculating TF-IDF")
     val moviesWithTFIDFVectors = tfWithLabel.map(m => (m._1, idf.transform(m._2)))
+
+    logger.log(Level.INFO, "Finished with TF-IDF calculation")
+
     /* load movie to genre mapping */
+    logger.log(Level.INFO, "Starting loading genres")
     val inputFile = sc.textFile("genres.list", 2).cache()
     val moviesWithGenres = inputFile.map(line => {
       val s = line.split("\t+")
@@ -46,6 +64,7 @@ object SparkGrep {
     }).reduceByKey((v1, v2) => Vectors.dense(v1.toArray.toList.zip(v2.toArray).map(w => Math.min(1.0, w._1 + w._2)).toArray))
       .join(movieTitles.map((_, 0))).map(v => (v._1, v._2._1)) // filter to only use the sampled movies from the plot description file - TODO: remove for no sampling!
 
+    logger.log(Level.INFO, "Finished loading genres")
 
     /* join TF-IDF vectors with genres to get labeled data */
     val moviesWithGenresAndTFIDFVector = moviesWithGenres.join(moviesWithTFIDFVectors)
@@ -59,20 +78,28 @@ object SparkGrep {
     /* ####################### TRAINING ####################### */
 
     /* train SVMs for genres */
+    logger.log(Level.INFO, "Starting training SVMs")
     var modelsLocal: Seq[SVMModel] = Seq()
     for(i <- 0 to genreList.value.length - 1) {
       modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i)
+      logger.log(Level.INFO, "Finished training SVM for '%s'".format(genreList.value(i)))
     }
     val models = sc.broadcast(modelsLocal.toArray)
+    logger.log(Level.INFO, "Finished training SVMs")
+
 
     /* ####################### TESTING ####################### */
 
     /* use trained models to predict genres of the test data */
+    logger.log(Level.INFO, "Starting testing based on SVMs")
     val res = moviesWithGenresAndTFIDFVector_test
       .map(m => (m._1, m._2._1, generatePredictedGenreVector(m._2._2, models.value)))
+    logger.log(Level.INFO, "Finished testing based on SVMs")
 
 
     /* ####################### EVALUATION ####################### */
+
+    logger.log(Level.INFO, "Starting evaluation")
 
     /* output some textual info about predicted and expected genres for the movies */
     res.foreach(m => {
@@ -85,7 +112,7 @@ object SparkGrep {
       val tooMuchPredicatedGenres = zipped.flatMap(v => if (v._1._1 < v._1._2) Seq(v._2) else Seq()).mkString(",")
       val correctlyPredictedGenres = zipped.flatMap(v => if ((v._1._1 == 1) && (v._1._2 == 1)) Seq(v._2) else Seq()).mkString(",")
 
-      println("%s: correctly classified: [%s] | not classified: [%s] | too much classified: [%s]"
+      logger.log(Level.INFO, "%s: correctly classified: [%s] | not classified: [%s] | too much classified: [%s]"
         .format(m._1, correctlyPredictedGenres, notPredicatedGenres, tooMuchPredicatedGenres))
     })
 
@@ -101,7 +128,7 @@ object SparkGrep {
 
     val errorPercentage = precision._1.toDouble / precision._2.toDouble
 
-    println("%d wrong classifications, %d right classifications -> error rate of %f"
+    logger.log(Level.INFO, "%d wrong classifications, %d right classifications -> error rate of %f"
       .format(precision._1, precision._2 - precision._1, errorPercentage))
 
     System.exit(0)
