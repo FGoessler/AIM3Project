@@ -1,8 +1,6 @@
-package spark.example
+package de.tuberlin.dima.aim3.project
 
-/* SimpleApp.scala */
-
-import org.apache.log4j.{Level, Priority, Logger}
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.classification.{SVMModel, SVMWithSGD}
 import org.apache.spark.mllib.feature.{HashingTF, IDF}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
@@ -10,14 +8,13 @@ import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
-
 case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
                   plotsInputFile: String = "plot_normalized.list",
-                  genresInputFile : String = "genres.list",
+                  genresInputFile: String = "genres.list",
                   outputFile: String = "",
-                  genres: Seq[String] = Seq("Comedy", "Drama"))   // TODO: add more genres
+                  genres: Seq[String] = Seq("Comedy", "Drama"))
 
-object SparkGrep {
+object IMDbMovieClassification {
 
   val logger = Logger.getLogger("## IMDb Movie Classification ##")
 
@@ -42,7 +39,15 @@ object SparkGrep {
 
     parser.parse(args, Config()) match {
       case Some(config) =>
+        exec(config)
+      case None =>
+      // arguments are bad, error message will have been displayed
+    }
 
+    System.exit(0)
+  }
+
+  def exec(config: Config): Unit = {
     val conf = new SparkConf()
       .setAppName("SparkGrep")
       .setMaster("local[*]")
@@ -57,11 +62,11 @@ object SparkGrep {
 
     /* read in plot descriptions */
     var documents = sc.textFile(config.plotsInputFile).cache()
-    if(config.sampling < 1.0) documents = documents.sample(withReplacement = false, config.sampling, 5)
+    if (config.sampling < 1.0) documents = documents.sample(withReplacement = false, config.sampling, 5)
     val plotsWithLabel = documents.map(line => {
-        val s = line.split(":::")
-        (s(0), s(1).split(" ").toSeq)
-      })
+      val s = line.split(":::")
+      (s(0), s(1).split(" ").toSeq)
+    })
 
     logger.log(Level.INFO, "Finished read plot descriptions from file")
 
@@ -91,7 +96,7 @@ object SparkGrep {
       val genreVector = Vectors.dense(genreList.value.map(f => if (f == s(1)) 1.0 else 0.0))
       (s(0), genreVector)
     }).reduceByKey((v1, v2) => Vectors.dense(v1.toArray.toList.zip(v2.toArray).map(w => Math.min(1.0, w._1 + w._2)).toArray))
-    if(config.sampling < 1.0) {
+    if (config.sampling < 1.0) {
       // filter to only use the sampled movies from the plot description file
       moviesWithGenres = moviesWithGenres.join(movieTitles.map((_, 0))).map(v => (v._1, v._2._1))
     }
@@ -101,7 +106,7 @@ object SparkGrep {
     /* join TF-IDF vectors with genres to get labeled data */
     val moviesWithGenresAndTFIDFVector = moviesWithGenres.join(moviesWithTFIDFVectors)
 
-     /* split data into training (70%) and test (30%) */
+    /* split data into training (70%) and test (30%) */
     val splits = moviesWithGenresAndTFIDFVector.randomSplit(Array(0.7, 0.3), seed = 11L)
     val moviesWithGenresAndTFIDFVector_training = splits(0).cache()
     val moviesWithGenresAndTFIDFVector_test = splits(1).cache()
@@ -112,7 +117,7 @@ object SparkGrep {
     /* train SVMs for genres */
     logger.log(Level.INFO, "Starting training SVMs")
     var modelsLocal: Seq[SVMModel] = Seq()
-    for(i <- 0 to genreList.value.length - 1) {
+    for (i <- 0 to genreList.value.length - 1) {
       modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i, config.svmIterations)
       logger.log(Level.INFO, "Finished training SVM for '%s'".format(genreList.value(i)))
     }
@@ -162,12 +167,6 @@ object SparkGrep {
 
     logger.log(Level.INFO, "%d wrong classifications, %d right classifications -> error rate of %f"
       .format(precision._1, precision._2 - precision._1, errorPercentage))
-
-      case None =>
-      // arguments are bad, error message will have been displayed
-    }
-
-    System.exit(0)
   }
 
   def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int, numIterations: Int): SVMModel = {
