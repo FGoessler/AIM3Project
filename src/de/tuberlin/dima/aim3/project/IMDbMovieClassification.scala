@@ -10,6 +10,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
                   trainingPercentage: Double = 0.7,
+                  printDetailed: Boolean = false,
                   plotsInputFile: String = "plot_normalized.list",
                   genresInputFile: String = "genres.list",
                   outputFile: Option[String] = None,
@@ -36,6 +37,9 @@ object IMDbMovieClassification {
       } validate { x =>
         if (x > 0.0 && x < 1.0) success else failure("Value <trainingPercentage> must be between 0.0 and 1.0")
       } text "Percentage of data that should be used for training. Remaining part will be used for testing. Default 0.7."
+      opt[Unit]('d', "printDetailed") optional() action { (_, c) =>
+        c.copy(printDetailed = true)
+      } text "Outputs classification results of every tested movie otherwise only outputs error stats."
       opt[String]('p', "plotsInputFile") optional() action { (x, c) =>
         c.copy(plotsInputFile = x)
       } text "File with all plot descriptions - default 'plot_normalized.list'."
@@ -70,6 +74,7 @@ object IMDbMovieClassification {
     /* ####################### PREPROCESSING ####################### */
 
     logger.log(Level.INFO, "Starting IMDb Movie Classification Task")
+    logger.log(Level.INFO, "Config: %s".format(config))
 
     /* predefined list of all genres that we analyze */
     val genreList = sc.broadcast(config.genres.toArray)
@@ -152,20 +157,23 @@ object IMDbMovieClassification {
 
     logger.log(Level.INFO, "Starting evaluation")
 
-    /* output some textual info about predicted and expected genres for the movies */
-    res.foreach(m => {
-      val genres = genreList.value
-      val expectedGenreVector = m._2
-      val predictedGenreVector = m._3
+    /* compute some textual info about predicted and expected genres for the movies */
+    var textualResult = sc.makeRDD(Seq[String]())
+    if (config.printDetailed) {
+      textualResult = res.map(m => {
+        val genres = genreList.value
+        val expectedGenreVector = m._2
+        val predictedGenreVector = m._3
 
-      val zipped = expectedGenreVector.toArray.toList.zip(predictedGenreVector.toArray).zip(genres)
-      val notPredicatedGenres = zipped.flatMap(v => if (v._1._1 > v._1._2) Seq(v._2) else Seq()).mkString(",")
-      val tooMuchPredicatedGenres = zipped.flatMap(v => if (v._1._1 < v._1._2) Seq(v._2) else Seq()).mkString(",")
-      val correctlyPredictedGenres = zipped.flatMap(v => if ((v._1._1 == 1) && (v._1._2 == 1)) Seq(v._2) else Seq()).mkString(",")
+        val zipped = expectedGenreVector.toArray.toList.zip(predictedGenreVector.toArray).zip(genres)
+        val notPredicatedGenres = zipped.flatMap(v => if (v._1._1 > v._1._2) Seq(v._2) else Seq()).mkString(",")
+        val tooMuchPredicatedGenres = zipped.flatMap(v => if (v._1._1 < v._1._2) Seq(v._2) else Seq()).mkString(",")
+        val correctlyPredictedGenres = zipped.flatMap(v => if ((v._1._1 == 1) && (v._1._2 == 1)) Seq(v._2) else Seq()).mkString(",")
 
-      writeToFileOrStdout("%s: correctly classified: [%s] | not classified: [%s] | too much classified: [%s]"
-        .format(m._1, correctlyPredictedGenres, notPredicatedGenres, tooMuchPredicatedGenres), config.outputFile)
-    })
+        "%s: correctly classified: [%s] | not classified: [%s] | too much classified: [%s]"
+          .format(m._1, correctlyPredictedGenres, notPredicatedGenres, tooMuchPredicatedGenres)
+      })
+    }
 
     /* calculate error rate */
     val precision = res.map(m => {
@@ -179,8 +187,16 @@ object IMDbMovieClassification {
 
     val errorPercentage = precision._1.toDouble / precision._2.toDouble
 
-    writeToFileOrStdout("%d wrong classifications, %d right classifications -> error rate of %f"
-      .format(precision._1, precision._2 - precision._1, errorPercentage), config.outputFile)
+    /* output results and error rate */
+    val joinedTextualResult = textualResult ++ sc.makeRDD(Seq("%d wrong classifications, %d right classifications -> error rate of %f"
+      .format(precision._1, precision._2 - precision._1, errorPercentage)))
+
+    config.outputFile match {
+      case Some(fname) =>
+        joinedTextualResult.saveAsTextFile(fname)
+      case None =>
+        joinedTextualResult.foreach(println(_))
+    }
   }
 
   def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int, numIterations: Int): SVMModel = {
@@ -192,13 +208,5 @@ object IMDbMovieClassification {
   def generatePredictedGenreVector(tfIDFVector: Vector, genreModels: Array[SVMModel]): Vector = {
     val prediction = genreModels.map(model => model.predict(tfIDFVector))
     Vectors.dense(prediction)
-  }
-
-  def writeToFileOrStdout(text: String, fname: Option[String] = None) = {
-    val outStream = fname match{
-      case Some(name) => new java.io.FileOutputStream(new java.io.File(name))
-      case None => System.out
-    }
-    outStream.write(text.getBytes)
   }
 }
