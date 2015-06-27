@@ -124,7 +124,7 @@ object SparkGrep {
 
       val errors = zipped.map(v => if (v._1 != v._2) 1 else 0).sum
       (errors.toLong, zipped.size.toLong)
-    }).reduce((v1, v2) => (v1._1 + v2._1, v1._1 + v2._1))
+    }).reduce((v1, v2) => (v1._1 + v2._1, v1._2 + v2._2))
 
     val errorPercentage = precision._1.toDouble / precision._2.toDouble
 
@@ -135,7 +135,7 @@ object SparkGrep {
   }
 
   def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int): SVMModel = {
-    val trainingDataForGenre = trainingData.map(m => LabeledPoint(m._2._1(genreIndex), m._2._2))
+    val trainingDataForGenre = trainingData.map(m => LabeledPoint(m._2._1(genreIndex), m._2._2)).cache()
     val model = SVMWithSGD.train(trainingDataForGenre, 100)
     model
   }
