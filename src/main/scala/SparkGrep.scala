@@ -10,11 +10,39 @@ import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
+
+case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
+                  plotsInputFile: String = "plot_normalized.list",
+                  genresInputFile : String = "genres.list",
+                  outputFile: String = "",
+                  genres: Seq[String] = Seq("Comedy", "Drama"))   // TODO: add more genres
+
 object SparkGrep {
 
   val logger = Logger.getLogger("## IMDb Movie Classification ##")
 
   def main(args: Array[String]) {
+
+    val parser = new scopt.OptionParser[Config]("") {
+      head("IMDb Movie Classification")
+      opt[Double]('s', "sampling") optional() action { (x, c) =>
+        c.copy(sampling = x) } text "input data sampling rate - default 1.0 (all)"
+      opt[Int]('i', "svmIterations") optional() action { (x, c) =>
+        c.copy(svmIterations = x) } text "number of training iterations - default 100"
+      opt[String]('p', "plotsInputFile") optional() action { (x, c) =>
+        c.copy(plotsInputFile = x) } text "file with all plot descriptions - default plot_normalized.list"
+      opt[String]('g', "genresInputFile") optional() action { (x, c) =>
+        c.copy(genresInputFile = x) } text "file with all movie-genre mappings - default genres.list"
+      opt[String]('o', "outputFile") optional() action { (x, c) =>
+        c.copy(outputFile = x) } text "output file path - default stdout"
+      opt[Seq[String]]("genres") valueName "<genre1>,<genre2>..." optional() action { (x,c) =>
+        c.copy(genres = x) } text "genres to classify - default all"
+      help("help") text "prints this usage text"
+    }
+
+    parser.parse(args, Config()) match {
+      case Some(config) =>
+
     val conf = new SparkConf()
       .setAppName("SparkGrep")
       .setMaster("local[*]")
@@ -25,10 +53,11 @@ object SparkGrep {
     logger.log(Level.INFO, "Starting IMDb Movie Classification Task")
 
     /* predefined list of all genres that we analyze */
-    val genreList = sc.broadcast(Array("Comedy", "Drama")) // TODO: add more genres
+    val genreList = sc.broadcast(config.genres.toArray)
 
     /* read in plot descriptions */
-    val documents = sc.textFile("plot_normalized.list").cache().sample(withReplacement = false, 0.1, 5) //TODO: remove sampling
+    var documents = sc.textFile(config.plotsInputFile).cache()
+    if(config.sampling < 1.0) documents = documents.sample(withReplacement = false, config.sampling, 5)
     val plotsWithLabel = documents.map(line => {
         val s = line.split(":::")
         (s(0), s(1).split(" ").toSeq)
@@ -56,13 +85,16 @@ object SparkGrep {
 
     /* load movie to genre mapping */
     logger.log(Level.INFO, "Starting loading genres")
-    val inputFile = sc.textFile("genres.list", 2).cache()
-    val moviesWithGenres = inputFile.map(line => {
+    val inputFile = sc.textFile(config.genresInputFile, 2).cache()
+    var moviesWithGenres = inputFile.map(line => {
       val s = line.split("\t+")
       val genreVector = Vectors.dense(genreList.value.map(f => if (f == s(1)) 1.0 else 0.0))
       (s(0), genreVector)
     }).reduceByKey((v1, v2) => Vectors.dense(v1.toArray.toList.zip(v2.toArray).map(w => Math.min(1.0, w._1 + w._2)).toArray))
-      .join(movieTitles.map((_, 0))).map(v => (v._1, v._2._1)) // filter to only use the sampled movies from the plot description file - TODO: remove for no sampling!
+    if(config.sampling < 1.0) {
+      // filter to only use the sampled movies from the plot description file
+      moviesWithGenres = moviesWithGenres.join(movieTitles.map((_, 0))).map(v => (v._1, v._2._1))
+    }
 
     logger.log(Level.INFO, "Finished loading genres")
 
@@ -81,7 +113,7 @@ object SparkGrep {
     logger.log(Level.INFO, "Starting training SVMs")
     var modelsLocal: Seq[SVMModel] = Seq()
     for(i <- 0 to genreList.value.length - 1) {
-      modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i)
+      modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i, config.svmIterations)
       logger.log(Level.INFO, "Finished training SVM for '%s'".format(genreList.value(i)))
     }
     val models = sc.broadcast(modelsLocal.toArray)
@@ -131,12 +163,16 @@ object SparkGrep {
     logger.log(Level.INFO, "%d wrong classifications, %d right classifications -> error rate of %f"
       .format(precision._1, precision._2 - precision._1, errorPercentage))
 
+      case None =>
+      // arguments are bad, error message will have been displayed
+    }
+
     System.exit(0)
   }
 
-  def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int): SVMModel = {
+  def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int, numIterations: Int): SVMModel = {
     val trainingDataForGenre = trainingData.map(m => LabeledPoint(m._2._1(genreIndex), m._2._2)).cache()
-    val model = SVMWithSGD.train(trainingDataForGenre, 100)
+    val model = SVMWithSGD.train(trainingDataForGenre, numIterations)
     model
   }
 
