@@ -179,20 +179,53 @@ object IMDbMovieClassification {
     }
 
     /* calculate error rate */
-    val precision = res.map(m => {
+    val errorStats = res.map(m => {
       val expectedGenreVector = m._2
       val predictedGenreVector: Vector = m._3
       val zipped = expectedGenreVector.toArray.toList.zip(predictedGenreVector.toArray)
 
-      val errors = zipped.map(v => if (v._1 != v._2) 1 else 0).sum
-      (errors.toLong, zipped.size.toLong)
-    }).reduce((v1, v2) => (v1._1 + v2._1, v1._2 + v2._2))
+      val errStats = zipped.map(v => {
+        val falsePositive = if (v._1 == 0 && v._2 == 1) 1 else 0
+        val falseNegative = if (v._1 == 1 && v._2 == 0) 1 else 0
+        (falsePositive, falseNegative)
+      })
+      val completelyCorrectlyClassified = if (errStats.map(v => v._1 + v._2).sum == 0) 1 else 0
 
-    val errorPercentage = precision._1.toDouble / precision._2.toDouble
+      (errStats, 1, completelyCorrectlyClassified)
+    }).reduce((v1, v2) => {
+      (v1._1.zip(v2._1).map(x => (x._1._1 + x._2._1, x._1._2 + x._2._2)), v1._2 + v2._2, v1._3 + v2._3)
+    })
+
+    val numClassifiedMovies = errorStats._2
+    val numCompletelyCorrectlyClassifiedMovies = errorStats._3
+
+    val precision = errorStats._1.reduce( (v1, v2) => (v1._1 + v2._1, v1._2 + v2._2))
+    val numTotalFalsePositives = precision._1
+    val numTotalFalseNegatives = precision._2
+    val numTotalErrors = precision._1 + precision._2
+    val numClassifications = errorStats._1.size * numClassifiedMovies
 
     /* output results and error rate */
-    val joinedTextualResult = textualResult ++ sc.makeRDD(Seq("%d wrong classifications, %d right classifications -> error rate of %f"
-      .format(precision._1, precision._2 - precision._1, errorPercentage)))
+    val errorPerGenreTextualResult = errorStats._1.zip(genreList.value).map(e => {
+      "%s: false-positives: %d (%f) | false-negatives: %d (%f) | right classifications: %d (%f)| error rate: %f".format(e._2,
+        e._1._1, e._1._1.toDouble / numClassifiedMovies.toDouble,
+        e._1._2, e._1._2.toDouble / numClassifiedMovies.toDouble,
+        numClassifiedMovies - e._1._2 - e._1._2, (numClassifiedMovies - e._1._2 - e._1._2).toDouble / numClassifiedMovies.toDouble,
+        (e._1._1.toDouble + e._1._2.toDouble) / numClassifiedMovies.toDouble)
+    })
+
+    val completelyCorrectlyClassifiedMoviesString = "## Total: %d of %d (%f) movies completely correctly classified ##"
+      .format(numCompletelyCorrectlyClassifiedMovies, numClassifiedMovies, numCompletelyCorrectlyClassifiedMovies.toDouble / numClassifiedMovies.toDouble)
+
+    val totalErrorString = "## Total: %d false-positives (%f) | %d false-negatives (%f) | %d wrong classifications (%f) | %d right classifications (%f) ##"
+      .format(numTotalFalsePositives, numTotalFalsePositives.toDouble / numClassifications.toDouble,
+        numTotalFalseNegatives, numTotalFalseNegatives / numClassifications.toDouble,
+        numTotalErrors, numTotalErrors.toDouble / numClassifications.toDouble,
+        numClassifications - numTotalErrors, (numClassifications - numTotalErrors).toDouble / numClassifications.toDouble)
+
+    val errorRatesStrings = errorPerGenreTextualResult ++ Seq(completelyCorrectlyClassifiedMoviesString) ++ Seq(totalErrorString)
+
+    val joinedTextualResult = textualResult ++ sc.makeRDD(errorRatesStrings)
 
     config.outputFile match {
       case Some(fname) =>
