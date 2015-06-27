@@ -20,39 +20,36 @@ object SparkGrep {
     val genreList = sc.broadcast(Array("Comedy", "Drama")) // TODO: add more genres
 
     /* read in plot descriptions */
-    // TODO
-    val documents = sc.textFile("plot.list").cache().sample(withReplacement = false, 0.001, 5)
+    val documents = sc.textFile("plot_normalized.list").cache().sample(withReplacement = false, 0.001, 5) //TODO: remove sampling
+    val plotsWithLabel = documents.map(line => {
+        val s = line.split(":::")
+        (s(0), s(1).split(" ").toSeq)
+      })
+
+    /* create a list of all available movie titles */
+    val movieTitles = plotsWithLabel.map(_._1).distinct()
 
     /* calculate TF-IDF vectors */
-    // TODO
-    val plotsWithLabel:RDD[(String,Seq[String])] = documents.map(line =>{
-      val s = line.split(":::")
-      (s(0),s(1).split(" ").toSeq)
-    })
     val hashingTF = new HashingTF()
-    val tfWithLabel = plotsWithLabel.map(m => (m._1,hashingTF.transform(m._2)))
+    val tfWithLabel = plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
 
     val tf = tfWithLabel.map(m => m._2)
-    val idf = new IDF().fit(tf)
-    val tfidfWithLabel = tfWithLabel.map(m => (m._1,idf.transform(m._2)))
+    val idf = new IDF().fit(tf) //TODO: transmit as a broadcast variable?
 
+    val moviesWithTFIDFVectors = tfWithLabel.map(m => (m._1, idf.transform(m._2)))
     /* load movie to genre mapping */
-    val inputFile = sc.textFile("genres.list", 2).cache().sample(withReplacement = false, 0.1, 5)   //TODO: remove sampling
+    val inputFile = sc.textFile("genres.list", 2).cache()
     val moviesWithGenres = inputFile.map(line => {
       val s = line.split("\t+")
       val genreVector = Vectors.dense(genreList.value.map(f => if (f == s(1)) 1.0 else 0.0))
       (s(0), genreVector)
     }).reduceByKey((v1, v2) => Vectors.dense(v1.toArray.toList.zip(v2.toArray).map(w => Math.min(1.0, w._1 + w._2)).toArray))
+      .join(movieTitles.map((_, 0))).map(v => (v._1, v._2._1)) // filter to only use the sampled movies from the plot description file - TODO: remove for no sampling!
 
-    /* create a list of all available movie titles */
-    // TODO: maybe generate this from the plot description input cause there shouldn't be any duplicates
-    val movieTitles = moviesWithGenres.map(_._1).distinct()
-
-    // TODO: replace with actual calculated TF-IDF vectors
-    val moviesWithTFIDFVectors = movieTitles.map(m => (m, Vectors.dense(Array(1.0, 2.0, 3.0, 4.0))))
 
     /* join TF-IDF vectors with genres to get labeled data */
     val moviesWithGenresAndTFIDFVector = moviesWithGenres.join(moviesWithTFIDFVectors)
+
      /* split data into training (70%) and test (30%) */
     val splits = moviesWithGenresAndTFIDFVector.randomSplit(Array(0.7, 0.3), seed = 11L)
     val moviesWithGenresAndTFIDFVector_training = splits(0).cache()
@@ -73,7 +70,6 @@ object SparkGrep {
     /* use trained models to predict genres of the test data */
     val res = moviesWithGenresAndTFIDFVector_test
       .map(m => (m._1, m._2._1, generatePredictedGenreVector(m._2._2, models.value)))
-
 
 
     /* ####################### EVALUATION ####################### */
