@@ -14,7 +14,10 @@ case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
                   plotsInputFile: String = "plot_normalized.list",
                   genresInputFile: String = "genres.list",
                   outputFile: Option[String] = None,
-                  genres: Seq[String] = Seq("Comedy", "Drama"))
+                  genres: Seq[String] = Seq("Comedy", "Drama", "Action", "Documentary", "Adult",
+                    "Romance", "Thriller", "Animation", "Family", "Horror", "Music", "Crime",
+                    "Adventure", "Fantasy", "Sci-Fi", "Mystery", "Biography", "History", "Sport",
+                    "Musical", "War", "Western", "News", "Reality-TV"))
 
 object IMDbMovieClassification {
 
@@ -100,7 +103,7 @@ object IMDbMovieClassification {
 
     logger.log(Level.INFO, "Starting calculating IDF")
     val tf = tfWithLabel.map(m => m._2)
-    val idf = new IDF().fit(tf) //TODO: transmit as a broadcast variable?
+    val idf = new IDF().fit(tf)
 
     logger.log(Level.INFO, "Starting calculating TF-IDF")
     val moviesWithTFIDFVectors = tfWithLabel.map(m => (m._1, idf.transform(m._2)))
