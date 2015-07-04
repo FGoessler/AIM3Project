@@ -12,6 +12,7 @@ case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
                   trainingPercentage: Double = 0.7,
                   printDetailed: Boolean = false,
                   trainOnKeywords: Boolean = false,
+                  csvOutput: Boolean = false,
                   plotsInputFile: String = "plot_normalized.list",
                   genresInputFile: String = "genres.list",
                   keywordsInputFile: String = "keywords.list",
@@ -48,6 +49,9 @@ object IMDbMovieClassification {
       opt[Unit]('k', "trainOnKeywords") optional() action { (_, c) =>
         c.copy(trainOnKeywords = true)
       } text "Trains the SVMs based on the keyword data instead of plot description."
+      opt[Unit]("csv") optional() action { (_, c) =>
+        c.copy(csvOutput = true)
+      } text "Emits the results in a CSV format"
       opt[String]('p', "plotsInputFile") optional() action { (x, c) =>
         c.copy(plotsInputFile = x)
       } text "File with all plot descriptions - default 'plot_normalized.list'."
@@ -225,18 +229,20 @@ object IMDbMovieClassification {
 
     /* output results and error rate */
     val errorPerGenreTextualResult = errorStats._1.zip(genreList.value).map(e => {
-      "%s: false-positives: %d (%f) | false-negatives: %d (%f) | right classifications: %d (%f)| error rate: %f".format(e._2,
+      val formatString = if (config.csvOutput) "%s,%d,%f,%d,%f,%d,%f,%d,%f" else "%s: false-positives: %d (%f) | false-negatives: %d (%f) | %d wrong classifications (%f) | right classifications: %d (%f)"
+      formatString.format(e._2,
         e._1._1, e._1._1.toDouble / numClassifiedMovies.toDouble,
         e._1._2, e._1._2.toDouble / numClassifiedMovies.toDouble,
-        numClassifiedMovies - e._1._2 - e._1._2, (numClassifiedMovies - e._1._2 - e._1._2).toDouble / numClassifiedMovies.toDouble,
-        (e._1._1.toDouble + e._1._2.toDouble) / numClassifiedMovies.toDouble)
+        e._1._1 + e._1._2, (e._1._1.toDouble + e._1._2.toDouble) / numClassifiedMovies.toDouble,
+        numClassifiedMovies - e._1._2 - e._1._2, (numClassifiedMovies - e._1._2 - e._1._2).toDouble / numClassifiedMovies.toDouble)
     })
 
     val completelyCorrectlyClassifiedMoviesString = "## Total: %d of %d (%f) movies completely correctly classified ##"
       .format(numCompletelyCorrectlyClassifiedMovies, numClassifiedMovies, numCompletelyCorrectlyClassifiedMovies.toDouble / numClassifiedMovies.toDouble)
 
-    val totalErrorString = "## Total: %d false-positives (%f) | %d false-negatives (%f) | %d wrong classifications (%f) | %d right classifications (%f) ##"
-      .format(numTotalFalsePositives, numTotalFalsePositives.toDouble / numClassifications.toDouble,
+    val formatString = if (config.csvOutput) "Total,%d,%f,%d,%f,%d,%f,%d,%f" else "## Total: false-positives: %d (%f) | false-negatives: %d (%f) | %d wrong classifications (%f) | right classifications: %d (%f) ##"
+    val totalErrorString = formatString.format(
+        numTotalFalsePositives, numTotalFalsePositives.toDouble / numClassifications.toDouble,
         numTotalFalseNegatives, numTotalFalseNegatives / numClassifications.toDouble,
         numTotalErrors, numTotalErrors.toDouble / numClassifications.toDouble,
         numClassifications - numTotalErrors, (numClassifications - numTotalErrors).toDouble / numClassifications.toDouble)
