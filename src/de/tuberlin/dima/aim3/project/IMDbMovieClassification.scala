@@ -109,7 +109,7 @@ object IMDbMovieClassification {
 
       /* create a list of all available movie titles */
       movieTitles = plotsWithLabel.map(_._1).distinct()
-      logger.log(Level.INFO, "Using %d movies".format(movieTitles.count()))
+      logger.log(Level.INFO, "Building features for %d movies".format(movieTitles.count()))
 
       /* calculate TF-IDF vectors */
       logger.log(Level.INFO, "Starting calculating TF")
@@ -125,7 +125,7 @@ object IMDbMovieClassification {
 
       /* create a list of all available movie titles */
       movieTitles = moviesWithKeywords.map(_._1).distinct()
-      logger.log(Level.INFO, "Using %d movies".format(movieTitles.count()))
+      logger.log(Level.INFO, "Building features for %d movies".format(movieTitles.count()))
 
       /* construct feature vector */
       val keywordsTF = new HashingTF()
@@ -135,26 +135,36 @@ object IMDbMovieClassification {
     /* load movie to genre mapping */
     logger.log(Level.INFO, "Starting loading genres")
     val inputFile = sc.textFile(config.genresInputFile, 2).cache()
-    var moviesWithGenres = inputFile.map(line => {
+    var moviesWithGenres = inputFile.flatMap(line => {
       val s = line.split("\t+")
       val genreVector = Vectors.dense(genreList.value.map(f => if (f == s(1)) 1.0 else 0.0))
-      (s(0), genreVector)
+      // filter out movies with no genre info
+      if (genreVector.numNonzeros > 0) {
+        Seq((s(0), genreVector))
+      } else {
+        Seq()
+      }
     }).reduceByKey((v1, v2) => Vectors.dense(v1.toArray.toList.zip(v2.toArray).map(w => Math.min(1.0, w._1 + w._2)).toArray))
     if (config.sampling < 1.0) {
       // filter to only use the sampled movies from the plot description file
       moviesWithGenres = moviesWithGenres.join(movieTitles.map((_, 0))).map(v => (v._1, v._2._1))
     }
 
+    logger.log(Level.INFO, "Using %d movies with genre data".format(moviesWithGenres.count()))
     logger.log(Level.INFO, "Finished loading genres")
 
-    /* join TF-IDF vectors with genres to get labeled data */
-    val moviesWithGenresAndTFIDFVector = moviesWithGenres.join(featureVectorWithLabel)
+    /* join feature vectors with genres to get labeled data */
+    val moviesWithGenresAndFeatureVector = moviesWithGenres.join(featureVectorWithLabel)
 
     /* split data into training and test */
-    val splits = moviesWithGenresAndTFIDFVector.randomSplit(Array(config.trainingPercentage, 1.0 - config.trainingPercentage), seed = 11L)
-    val moviesWithGenresAndTFIDFVector_training = splits(0).cache()
-    val moviesWithGenresAndTFIDFVector_test = splits(1).cache()
+    val splits = moviesWithGenresAndFeatureVector.randomSplit(Array(config.trainingPercentage, 1.0 - config.trainingPercentage), seed = 11L)
+    val moviesWithGenresAndFeatureVector_training = splits(0).cache()
+    val moviesWithGenresAndFeatureVector_test = splits(1).cache()
 
+    logger.log(Level.INFO, "Training on %d movies | Testing on %d movies".format(
+      moviesWithGenresAndFeatureVector_training.count(),
+      moviesWithGenresAndFeatureVector_test.count())
+    )
 
     /* ####################### TRAINING ####################### */
 
@@ -162,7 +172,7 @@ object IMDbMovieClassification {
     logger.log(Level.INFO, "Starting training SVMs")
     var modelsLocal: Seq[SVMModel] = Seq()
     for (i <- genreList.value.indices) {
-      modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i, config.svmIterations)
+      modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndFeatureVector_training, i, config.svmIterations)
       logger.log(Level.INFO, "Finished training SVM for '%s'".format(genreList.value(i)))
     }
     val models = sc.broadcast(modelsLocal.toArray)
@@ -173,7 +183,7 @@ object IMDbMovieClassification {
 
     /* use trained models to predict genres of the test data */
     logger.log(Level.INFO, "Starting testing based on SVMs")
-    val res = moviesWithGenresAndTFIDFVector_test
+    val res = moviesWithGenresAndFeatureVector_test
       .map(m => (m._1, m._2._1, generatePredictedGenreVector(m._2._2, models.value)))
     logger.log(Level.INFO, "Finished testing based on SVMs")
 
