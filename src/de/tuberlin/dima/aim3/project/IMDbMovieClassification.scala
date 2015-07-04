@@ -11,8 +11,10 @@ import org.apache.spark.{SparkConf, SparkContext}
 case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
                   trainingPercentage: Double = 0.7,
                   printDetailed: Boolean = false,
+                  trainOnKeywords: Boolean = false,
                   plotsInputFile: String = "plot_normalized.list",
                   genresInputFile: String = "genres.list",
+                  keywordsInputFile: String = "keywords.list",
                   outputFile: Option[String] = None,
                   genres: Seq[String] = Seq("Comedy", "Drama", "Action", "Documentary", "Adult",
                     "Romance", "Thriller", "Animation", "Family", "Horror", "Music", "Crime",
@@ -43,12 +45,18 @@ object IMDbMovieClassification {
       opt[Unit]('d', "printDetailed") optional() action { (_, c) =>
         c.copy(printDetailed = true)
       } text "Outputs classification results of every tested movie otherwise only outputs error stats."
+      opt[Unit]('k', "trainOnKeywords") optional() action { (_, c) =>
+        c.copy(trainOnKeywords = true)
+      } text "Trains the SVMs based on the keyword data instead of plot description."
       opt[String]('p', "plotsInputFile") optional() action { (x, c) =>
         c.copy(plotsInputFile = x)
       } text "File with all plot descriptions - default 'plot_normalized.list'."
       opt[String]('g', "genresInputFile") optional() action { (x, c) =>
         c.copy(genresInputFile = x)
       } text "File with all movie-genre mappings - default 'genres.list'."
+      opt[String]('g', "keywordsInputFile") optional() action { (x, c) =>
+        c.copy(keywordsInputFile = x)
+      } text "File with all movie-keywords mappings - default 'keywords.list'."
       opt[String]('o', "outputFile") optional() action { (x, c) =>
         c.copy(outputFile = Some(x))
       } text "Output file path - default stdout."
@@ -82,33 +90,43 @@ object IMDbMovieClassification {
     /* predefined list of all genres that we analyze */
     val genreList = sc.broadcast(config.genres.toArray)
 
-    /* read in plot descriptions */
-    var documents = sc.textFile(config.plotsInputFile).cache()
-    if (config.sampling < 1.0) documents = documents.sample(withReplacement = false, config.sampling, 5)
-    val plotsWithLabel = documents.map(line => {
-      val s = line.split(":::")
-      (s(0), s(1).split(" ").toSeq)
-    })
+    var movieTitles: RDD[String] = null
+    var featureVectorWithLabel: RDD[(String, Vector)] = null
+    if (!config.trainOnKeywords) {
+      /* read in plot descriptions */
+      var documents = sc.textFile(config.plotsInputFile).cache()
+      if (config.sampling < 1.0) documents = documents.sample(withReplacement = false, config.sampling, 5)
+      val plotsWithLabel = documents.map(line => {
+        val s = line.split(":::")
+        (s(0), s(1).split(" ").toSeq)
+      })
 
-    logger.log(Level.INFO, "Finished read plot descriptions from file")
+      logger.log(Level.INFO, "Finished read plot descriptions from file")
 
-    /* create a list of all available movie titles */
-    val movieTitles = plotsWithLabel.map(_._1).distinct()
-    logger.log(Level.INFO, "Using %d movies".format(movieTitles.count()))
+      /* create a list of all available movie titles */
+      movieTitles = plotsWithLabel.map(_._1).distinct()
+      logger.log(Level.INFO, "Using %d movies".format(movieTitles.count()))
 
-    /* calculate TF-IDF vectors */
-    logger.log(Level.INFO, "Starting calculating TF")
-    val hashingTF = new HashingTF()
-    val tfWithLabel = plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
+      /* calculate TF-IDF vectors */
+      logger.log(Level.INFO, "Starting calculating TF")
+      val hashingTF = new HashingTF()
+      featureVectorWithLabel = plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
+    } else {
+      /* load keywords */
+      val keywordsInputFile = sc.textFile(config.genresInputFile, 2).cache()
+      val moviesWithKeywords = keywordsInputFile.map(line => {
+        val s = line.split("\t+")
+        (s(0), Seq(s(1)))
+      }).reduceByKey((k1, k2) => k1 ++ k2)
 
-    logger.log(Level.INFO, "Starting calculating IDF")
-    val tf = tfWithLabel.map(m => m._2)
-    val idf = new IDF().fit(tf)
+      /* create a list of all available movie titles */
+      movieTitles = moviesWithKeywords.map(_._1).distinct()
+      logger.log(Level.INFO, "Using %d movies".format(movieTitles.count()))
 
-    logger.log(Level.INFO, "Starting calculating TF-IDF")
-    val moviesWithTFIDFVectors = tfWithLabel.map(m => (m._1, idf.transform(m._2)))
-
-    logger.log(Level.INFO, "Finished with TF-IDF calculation")
+      /* construct feature vector */
+      val keywordsTF = new HashingTF()
+      featureVectorWithLabel = moviesWithKeywords.map(m => (m._1, keywordsTF.transform(m._2)))
+    }
 
     /* load movie to genre mapping */
     logger.log(Level.INFO, "Starting loading genres")
@@ -126,7 +144,7 @@ object IMDbMovieClassification {
     logger.log(Level.INFO, "Finished loading genres")
 
     /* join TF-IDF vectors with genres to get labeled data */
-    val moviesWithGenresAndTFIDFVector = moviesWithGenres.join(moviesWithTFIDFVectors)
+    val moviesWithGenresAndTFIDFVector = moviesWithGenres.join(featureVectorWithLabel)
 
     /* split data into training and test */
     val splits = moviesWithGenresAndTFIDFVector.randomSplit(Array(config.trainingPercentage, 1.0 - config.trainingPercentage), seed = 11L)
@@ -139,7 +157,7 @@ object IMDbMovieClassification {
     /* train SVMs for genres */
     logger.log(Level.INFO, "Starting training SVMs")
     var modelsLocal: Seq[SVMModel] = Seq()
-    for (i <- 0 to genreList.value.length - 1) {
+    for (i <- genreList.value.indices) {
       modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndTFIDFVector_training, i, config.svmIterations)
       logger.log(Level.INFO, "Finished training SVM for '%s'".format(genreList.value(i)))
     }
