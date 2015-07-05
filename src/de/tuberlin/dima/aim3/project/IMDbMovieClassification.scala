@@ -95,8 +95,9 @@ object IMDbMovieClassification {
     val genreList = sc.broadcast(config.genres.toArray)
 
     var movieTitles: RDD[String] = null
-    var featureVectorWithLabel: RDD[(String, Vector)] = null
-    if (!config.trainOnKeywords) {
+    var featureVector1WithLabel: RDD[(String, Vector)] = null
+    var featureVector2WithLabel: RDD[(String, Vector)] = null
+    //if (!config.trainOnKeywords) {
       /* read in plot descriptions */
       var documents = sc.textFile(config.plotsInputFile).cache()
       if (config.sampling < 1.0) documents = documents.sample(withReplacement = false, config.sampling, 5)
@@ -114,8 +115,8 @@ object IMDbMovieClassification {
       /* calculate TF-IDF vectors */
       logger.log(Level.INFO, "Starting calculating TF")
       val hashingTF = new HashingTF()
-      featureVectorWithLabel = plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
-    } else {
+      featureVector1WithLabel = plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
+    //} else {
       /* load keywords */
       val keywordsInputFile = sc.textFile(config.genresInputFile, 2).cache()
       val moviesWithKeywords = keywordsInputFile.map(line => {
@@ -129,8 +130,9 @@ object IMDbMovieClassification {
 
       /* construct feature vector */
       val keywordsTF = new HashingTF()
-      featureVectorWithLabel = moviesWithKeywords.map(m => (m._1, keywordsTF.transform(m._2)))
-    }
+      featureVector2WithLabel = moviesWithKeywords.map(m => (m._1, keywordsTF.transform(m._2)))
+    //}
+    // TODO: build feature vector based on actors
 
     /* load movie to genre mapping */
     logger.log(Level.INFO, "Starting loading genres")
@@ -154,7 +156,10 @@ object IMDbMovieClassification {
     logger.log(Level.INFO, "Finished loading genres")
 
     /* join feature vectors with genres to get labeled data */
-    val moviesWithGenresAndFeatureVector = moviesWithGenres.join(featureVectorWithLabel)
+    val moviesWithGenresAndFeatureVector = moviesWithGenres
+      .join(featureVector1WithLabel)
+      .join(featureVector2WithLabel)
+      .map(x => (x._1, x._2._1._1, x._2._1._2, x._2._2))
 
     /* split data into training and test */
     val splits = moviesWithGenresAndFeatureVector.randomSplit(Array(config.trainingPercentage, 1.0 - config.trainingPercentage), seed = 11L)
@@ -170,12 +175,14 @@ object IMDbMovieClassification {
 
     /* train SVMs for genres */
     logger.log(Level.INFO, "Starting training SVMs")
-    var modelsLocal: Seq[SVMModel] = Seq()
+    var modelsLocal1: Seq[SVMModel] = Seq()
+    var modelsLocal2: Seq[SVMModel] = Seq()
     for (i <- genreList.value.indices) {
-      modelsLocal = modelsLocal :+ trainModelForGenre(moviesWithGenresAndFeatureVector_training, i, config.svmIterations)
+      modelsLocal1 = modelsLocal1 :+ trainModel1ForGenre(moviesWithGenresAndFeatureVector_training, i, config.svmIterations)
+      modelsLocal2 = modelsLocal2 :+ trainModel2ForGenre(moviesWithGenresAndFeatureVector_training, i, config.svmIterations)
       logger.log(Level.INFO, "Finished training SVM for '%s'".format(genreList.value(i)))
     }
-    val models = sc.broadcast(modelsLocal.toArray)
+    val models = sc.broadcast(modelsLocal1.zip(modelsLocal2).toArray)
     logger.log(Level.INFO, "Finished training SVMs")
 
 
@@ -184,7 +191,7 @@ object IMDbMovieClassification {
     /* use trained models to predict genres of the test data */
     logger.log(Level.INFO, "Starting testing based on SVMs")
     val res = moviesWithGenresAndFeatureVector_test
-      .map(m => (m._1, m._2._1, generatePredictedGenreVector(m._2._2, models.value)))
+      .map(m => (m._1, m._2, generatePredictedGenreVector((m._3, m._4), models.value)))
     logger.log(Level.INFO, "Finished testing based on SVMs")
 
 
@@ -222,6 +229,8 @@ object IMDbMovieClassification {
         (falsePositive, falseNegative)
       })
       val completelyCorrectlyClassified = if (errStats.map(v => v._1 + v._2).sum == 0) 1 else 0
+      //TODO: collect additional error classes: only-1-false-negative, only-1-false-positive, only-2-false-negative, only-2-false-positive, only-1-false-negative-&-1-false-positive, ...
+
 
       (errStats, 1, completelyCorrectlyClassified)
     }).reduce((v1, v2) => {
@@ -269,14 +278,20 @@ object IMDbMovieClassification {
     }
   }
 
-  def trainModelForGenre(trainingData: RDD[(String, (Vector, Vector))], genreIndex: Int, numIterations: Int): SVMModel = {
-    val trainingDataForGenre = trainingData.map(m => LabeledPoint(m._2._1(genreIndex), m._2._2)).cache()
+  def trainModel1ForGenre(trainingData: RDD[(String, Vector, Vector, Vector)], genreIndex: Int, numIterations: Int): SVMModel = {
+    val trainingDataForGenre = trainingData.map(m => LabeledPoint(m._2(genreIndex), m._3)).cache()
     val model = SVMWithSGD.train(trainingDataForGenre, numIterations)
     model
   }
 
-  def generatePredictedGenreVector(tfIDFVector: Vector, genreModels: Array[SVMModel]): Vector = {
-    val prediction = genreModels.map(model => model.predict(tfIDFVector))
+  def trainModel2ForGenre(trainingData: RDD[(String, Vector, Vector, Vector)], genreIndex: Int, numIterations: Int): SVMModel = {
+    val trainingDataForGenre = trainingData.map(m => LabeledPoint(m._2(genreIndex), m._4)).cache()
+    val model = SVMWithSGD.train(trainingDataForGenre, numIterations)
+    model
+  }
+
+  def generatePredictedGenreVector(featureVectors: (Vector, Vector), genreModels: Array[(SVMModel, SVMModel)]): Vector = {
+    val prediction = genreModels.map(models => (models._1.predict(featureVectors._1) + models._1.predict(featureVectors._2)) / 2.0)
     Vectors.dense(prediction)
   }
 }
