@@ -34,7 +34,9 @@ object IMDbMovieClassification {
         c.copy(sampling = x)
       } validate { x =>
         if (x > 0.0 && x <= 1.0) success else failure("Value <sampling> must be between 0.0 and 1.0")
-      } text "Input data sampling rate - default 1.0 (all)."
+      } text "Input data sampling rate - default 1.0 (all). Please note that when using multiple features the " +
+        "sampling rate is applied per feature. Since only movies with valid vectors for all features are evaluated the " +
+        "total amount of sampled movies that get evaluated might be smaller."
       opt[Int]('i', "svmIterations") optional() action { (x, c) =>
         c.copy(svmIterations = x)
       } text "Number of training iterations - default 100."
@@ -121,7 +123,8 @@ object IMDbMovieClassification {
 
     if (config.features.contains("keywords")) {
       /* load keywords */
-      val keywordsInputFile = sc.textFile(config.genresInputFile, 2).cache()
+      var keywordsInputFile = sc.textFile(config.genresInputFile, 2).cache()
+      if (config.sampling < 1.0) keywordsInputFile = keywordsInputFile.sample(withReplacement = false, config.sampling, 5)
       val moviesWithKeywords = keywordsInputFile.map(line => {
         val s = line.split("\t+")
         (s(0), Seq(s(1)))
