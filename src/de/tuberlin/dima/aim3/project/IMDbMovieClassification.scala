@@ -15,6 +15,7 @@ case class Config(sampling: Double = 1.0, svmIterations: Int = 100,
                   plotsInputFile: String = "plot_normalized.list",
                   genresInputFile: String = "genres.list",
                   keywordsInputFile: String = "keywords.list",
+                  actorsInputFile: String = "actors.list",
                   outputFile: Option[String] = None,
                   features: Seq[String] = Seq("plot", "keywords"),
                   genres: Seq[String] = Seq("Comedy", "Drama", "Action", "Documentary", "Adult",
@@ -60,12 +61,15 @@ object IMDbMovieClassification {
       opt[String]("keywordsInputFile") optional() action { (x, c) =>
         c.copy(keywordsInputFile = x)
       } text "File with all movie-keywords mappings - default 'keywords.list'."
+      opt[String]("actorsInputFile") optional() action { (x, c) =>
+        c.copy(actorsInputFile = x)
+      } text "File with all movie-actor mappings - default 'actors.list'."
       opt[String]('o', "outputFile") optional() action { (x, c) =>
         c.copy(outputFile = Some(x))
       } text "Output file path - default stdout."
       opt[Seq[String]]("features") valueName "<feature1>,<feature2>..." optional() action { (x, c) =>
         c.copy(features = x)
-      } text "Features to use for classification - default all. Possible values: plot,keywords"
+      } text "Features to use for classification - default all. Possible values: plot,keywords,actors"
       opt[Seq[String]]("genres") valueName "<genre1>,<genre2>..." optional() action { (x, c) =>
         c.copy(genres = x)
       } text "Genres to classify - default all."
@@ -112,7 +116,7 @@ object IMDbMovieClassification {
 
       /* create a list of all available movie titles */
       movieTitles = plotsWithLabel.map(_._1).distinct()
-      logger.log(Level.INFO, "Building features for %d movies".format(movieTitles.count()))
+      logger.log(Level.INFO, "Building features [plot] for %d movies".format(movieTitles.count()))
 
       /* calculate TF-IDF vectors */
       logger.log(Level.INFO, "Starting calculating TF")
@@ -132,14 +136,32 @@ object IMDbMovieClassification {
 
       /* create a list of all available movie titles */
       movieTitles = moviesWithKeywords.map(_._1).distinct()
-      logger.log(Level.INFO, "Building features for %d movies".format(movieTitles.count()))
+      logger.log(Level.INFO, "Building features [keywords] for %d movies".format(movieTitles.count()))
 
       /* construct feature vector */
       val keywordsTF = new HashingTF()
       featureVectorsWithLabel = featureVectorsWithLabel :+ moviesWithKeywords.map(m => (m._1, keywordsTF.transform(m._2)))
       numFeatureVectorsPerMovie = numFeatureVectorsPerMovie + 1
     }
-    // TODO: build feature vector based on actors
+
+    if (config.features.contains("actors")) {
+      /* load keywords */
+      var actorsInputFile = sc.textFile(config.actorsInputFile, 2).cache()
+      if (config.sampling < 1.0) actorsInputFile = actorsInputFile.sample(withReplacement = false, config.sampling, 5)
+      val moviesWithActors = actorsInputFile.map(line => {
+        val s = line.split("\t+")
+        (s(1), Seq(s(0)))
+      }).reduceByKey((k1, k2) => k1 ++ k2)
+
+      /* create a list of all available movie titles */
+      movieTitles = moviesWithActors.map(_._1).distinct()
+      logger.log(Level.INFO, "Building features [actors] for %d movies".format(movieTitles.count()))
+
+      /* construct feature vector */
+      val keywordsTF = new HashingTF()
+      featureVectorsWithLabel = featureVectorsWithLabel :+ moviesWithActors.map(m => (m._1, keywordsTF.transform(m._2)))
+      numFeatureVectorsPerMovie = numFeatureVectorsPerMovie + 1
+    }
 
     /* load movie to genre mapping */
     logger.log(Level.INFO, "Starting loading genres")
@@ -186,7 +208,7 @@ object IMDbMovieClassification {
     var modelsLocal: Seq[Seq[SVMModel]] = Seq()
     for (i <- genreList.value.indices) {
       modelsLocal = modelsLocal :+ trainModelsForGenre(moviesWithGenresAndFeatureVector_training, numFeatureVectorsPerMovie, i, config.svmIterations)
-      logger.log(Level.INFO, "Finished training SVM for '%s'".format(genreList.value(i)))
+      logger.log(Level.INFO, "Finished training SVMs for '%s'".format(genreList.value(i)))
     }
     val models = sc.broadcast(modelsLocal.toArray)
     logger.log(Level.INFO, "Finished training SVMs")
