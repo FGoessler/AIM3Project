@@ -54,10 +54,10 @@ object IMDbMovieClassification {
       opt[String]('p', "plotsInputFile") optional() action { (x, c) =>
         c.copy(plotsInputFile = x)
       } text "File with all plot descriptions - default 'plot_normalized.list'."
-      opt[String]('g', "genresInputFile") optional() action { (x, c) =>
+      opt[String]("genresInputFile") optional() action { (x, c) =>
         c.copy(genresInputFile = x)
       } text "File with all movie-genre mappings - default 'genres.list'."
-      opt[String]('g', "keywordsInputFile") optional() action { (x, c) =>
+      opt[String]("keywordsInputFile") optional() action { (x, c) =>
         c.copy(keywordsInputFile = x)
       } text "File with all movie-keywords mappings - default 'keywords.list'."
       opt[String]('o', "outputFile") optional() action { (x, c) =>
@@ -123,7 +123,7 @@ object IMDbMovieClassification {
 
     if (config.features.contains("keywords")) {
       /* load keywords */
-      var keywordsInputFile = sc.textFile(config.genresInputFile, 2).cache()
+      var keywordsInputFile = sc.textFile(config.keywordsInputFile, 2).cache()
       if (config.sampling < 1.0) keywordsInputFile = keywordsInputFile.sample(withReplacement = false, config.sampling, 5)
       val moviesWithKeywords = keywordsInputFile.map(line => {
         val s = line.split("\t+")
