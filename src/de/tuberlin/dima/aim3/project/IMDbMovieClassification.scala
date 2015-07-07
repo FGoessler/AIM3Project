@@ -121,7 +121,16 @@ object IMDbMovieClassification {
       /* calculate TF-IDF vectors */
       logger.log(Level.INFO, "Starting calculating TF")
       val hashingTF = new HashingTF()
-      featureVectorsWithLabel = featureVectorsWithLabel :+ plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
+      val plotTfWithLabel = plotsWithLabel.map(m => (m._1, hashingTF.transform(m._2)))
+
+      logger.log(Level.INFO, "Starting calculating IDF")
+      val tf = plotTfWithLabel.map(m => m._2)
+      val idf = new IDF().fit(tf)
+
+      logger.log(Level.INFO, "Starting calculating TF-IDF")
+      val moviesWithTFIDFVectors = plotTfWithLabel.map(m => (m._1, idf.transform(m._2)))
+      featureVectorsWithLabel = featureVectorsWithLabel :+ moviesWithTFIDFVectors
+
       numFeatureVectorsPerMovie = numFeatureVectorsPerMovie + 1
     }
 
