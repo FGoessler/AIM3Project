@@ -7,6 +7,18 @@
 
 \section{Introduction}
 
+TODO: generalize intro (not only plot)
+
+\par The International Movie Database (IMDb) with its over 3 million listed titles provides a great resources for information about all sorts of movies. Maintaining this amount of data is quite challenging as new movies need to be added all the time.
+Although the data is in a multi GB space one would not necessarily consider it to be ‘Big Data’. Especially in comparison to things like Twitters continuous stream of data or even large scale sensor networks the IMDb is quite small and any analysis could probably be done with conventional systems. But for this academic project we wanted to try to build a scaleable solution, which could be easily adopted for other, larger data sources.
+
+\par For this project we decided to try a classification task on the available movie metadata to predict its genres. This could be helpful for people who enter information about new movies or also to complete the IMDb since there are about 300.000 movies without genre information.
+Part of this analysis it text classification which is a problem that occurs in many domains.
+
+\par For the genre classification it is also interesting whether it is possible to predict a genre in a reliable way. Often this task is challenging even for humans cause a genre itself doesn’t have formal specification and can be a bit fuzzy. There are also mixups of genres, like a tragic comedy, which might be hard to classify since they contain features of multiple genres. Evaluating whether a machine can learn sort of a formal definition in form of some model is interesting since a further analysis of the model could lead to formal, human understandable definition of a genre. It could solve the question of “What makes up a genre?”.
+
+
+
 \section{Problem Statement}
 \subsection{Background}
 Movie genres are manually created categorical labels to characterize different movies. These genre labels can be used to describe the movie, contribute in movie recommendation based on the domain specified interests and some other fields. Currently the movie genres annotation are determined by us. The complexity in automatic genre classification is caused by the fact that usually the genres are not well  defined. Normally there are no strict definitions or boundaries between 2 different genres.  And of cause they share certain overlapping characteristics.
@@ -104,9 +116,74 @@ subject to (for any $i = 1,...,n$)
 y_i(\mathbf{w}\cdot\mathbf{x}_i-b)\ge1
 \end{displaymath}
 After getting the $\mathbf{w}$, given a new data point, denoted by $\mathbf{x}$
+
+
 \section{Experiment}
+
+\par We started our experiments with using the plot descriptions and performed multiple runs with different number of learning iterations of the SVMs. After that we used other features of the movie to see whether we could do better. We also combined several features.
+
+\par The first approach was to use the plot description and transform it to a TF-IDF vector for each movie. For this approach we could use TODO movies, which had a plot description as well as a genre label. 
+
+\par The second approach was to use keywords of the movies, which were explicitly assigned by the maintainers of the IMDb. This provides us a similar textual representation of the content of the movie but with the advantage of being already filtered by a human and also containing words that do not appear in a typical plot description but might describe the type of the movie quite well. We didn’t need to perform a TF-IDF transformation here since each keyword only appears once and we just constructed a vector per movie containing a 1 if it has a certain keyword and 0 if not. With this approach we could use TODO movies, which provided a set of keywords and a genre label.
+
+\par The third approach was to create a connection between actors and the genre of movies they usually appear in. This feature isn’t content based at all but could be of significance cause we assume that most actors stick to one kind of genre during their carer. Similar to the keywords approach we didn’t use a TF-IDF transformation and just binary n-dimensional vector to represent the fact whether a actor appeared in the movie or not. Here we had a dataset of TODO movies, which provided a list of actors as well as a genre label.
+
+\par As a final experiment we combined all 3 features. Therefore we constructed a set of 3 feature vectors - one for plot, one for keywords and one for actors - per movie. Now we trained 3 SVMs per genre - one for each feature vector. In the testing phase we feed the feature vectors to the SVMs and build a simple average over the results of all 3 SVMs per genre. Cause we could only use movies which provide valid feature vectors for all 3 features, we could only use a dataset of TODO movies.
+
+\par For all experiments we tried to classify the movie in 24 genres (see graph TODO). We didn’t consider the genre “Short” in our computation and analysis since it’s a very large and fuzzy genre which is basically only based on the length of a movie but the goal was to create a content related classification. Also the “genre” TODO only had one(?) movie in it was omitted cause of that.
+
+TODO: numbers and graph for \#movies with features
+
+
+
 \section{Results}
-\section{Conclution}
+
+TODO: explain “story”
+TODO: mention different data set sizes per feature/feature combination -> impact on results
+TODO: insert graphs
+
+\par Using the plot description as the only feature wasn’t really successful. Although the portion of erroneous single classification operations was at around 6 \%, there were many movies which weren’t classified correctly. This is caused by the fact that we use 24 SVMs - one SVM for each genre. Most of these SVMs answer with a correct prediction - in most cases with “false”, cause a movie usually only belongs to 1 to 3 genres. But it is enough that one of those SVMs answers with a wrong value and the movie ends up misclassified.
+\par Another interesting observation is that the amount of errors for the genres Drama, Comedy and Documentary is significantly higher than for other genres. Those 3 genres are the most common ones. One could expect that the SVMs are trained more precisely cause of a larger amount of positive training examples and a therefore more even distribution of negative and positive data points. But it seems like that the larger amount of movies in those genres leads to more diverse plot descriptions and a more fuzzy definition of the genre.
+\par When looking at the development of false-positive and false-negative classifications over increasing number of training iterations, one can see an overfitting of the model for Drama in alternating directions. With 5 iterations the false-positive rate is low and the false-negative rate is high, for 20 iterations the false-positive rate is high and the false-negative rate is low. The gap and error rate reduces with increasing number of training iterations but continues to be visible even at around 100 iterations.
+\par For most of the other genres false-positives aren’t an issue until 10 to 15 or even until 35 iterations. This is most likely due to the small amount of positive training examples which leads to strong tendency of always answering with no.
+\par The false-negative rates are quite stable with in most cases a slight tendency to a lower error rate, but there are also some genres like Romance which have a constant increase in the error rate with increasing number of iterations. The most significant improvements can be seen between 0 and 25 iterations.
+\par If we look at the overall error rate there’s usually an improvement with increasing number of training iterations. It seems to be stable after around 50 iterations. An reduction of false-negatives is often consumed by an increase in false-positives, leading to nearly horizontal lines for some genres. The alternating false-negatives and false-positives for genres like Drama or Comedy even themselves out and lead to a continuous curve in the total error rate.
+\par The number of completely correctly classified movies increased nearly continuously with increasing number of iterations - as one would expect it to be after seeing decreasing error rates. Interestingly there are small drops in the curve at 15 and 25 iterations. Those are the same spots where the Drama false-negative rates are high but the Drama false-positive rates are low. The curve increases significantly until 30 iterations with 23.7 \% accuracy and only slowly develops to 25 \% accuracy at 100 iterations.
+\par Overall the approach wasn’t satisfying with only ~25 \% completely correctly classified movies and in general the following rules hold:
+\begin{itemize}
+\item {The more SVMs iterations the more precise is the classification.}
+\item {The more movies belong to a genre the more errors in classification will happen.}
+\item {For reasonable results one can stop training after around 50 iterations.}
+\end{itemize}
+
+
+\bigskip
+\par In the next experiment we used the keywords as the only feature. The overall result was slightly better with 27.8 \% to 29.6 \% completely correctly classified movies.
+As for the plot based classification the genres Drama, Comedy and Documentary were the most difficult to classify. With false-positive rates of 13 to 19 \%. All other genres had false-positives rates below 7 \%. Interestingly the false-positive rate for Comedy was about five percent points higher than Drama, whereas the false-negative rate of Drama was around 10 \% while the false-negative rate for Comedy and Documentary weren’t much above the lower than 1 \% rates of the other genres. Overall the false-negative rates were really small and much better than for the plot based classification. For a higher number of iterations the same issue if increasing false-negatives rates were observable. The phenomena of alternating high and low false-negative and false-positive rates couldn’t be observed.
+\par In the overall error rates Drama was the most difficult to classify (~24 \% error) followed by Comedy (TODO) and documentary(TODO). All other genres where quite close and below TODO \% error rate. The error rate and also the rate of completely correctly classified movies did’t improve significantly with increasing number of iterations. Again most improvements in false-positives rates were neutralised by increasing false-negative rates. Only a small improvement between 5 and 20 iterations was noteable. The most improvements were observable for the 3 difficult genres Drama, Comedy \& Documentary.
+
+\bigskip
+\par The third experiment was to to only use the actors data as the feature vector. This experiment did’t perform much better than the plot based classification and lead to nearly the same rate of completely correctly classified movies of about 24.8 \%.
+\par The error rates stayed nearly constant and also the rate of completely correctly classified movies didn’t change with an increasing number of training iterations. Cause of that this approach delivered better results for a low number of iterations and was faster in the training phase cause of a lower dimensionality of the feature vectors.
+As in the previous two experiments the genres Drama, Comedy and Documentary were the ones with the highest error rates.
+
+\bigskip
+All 3 combined:
+significantly better results (up to 43,9%)
+significant increase with iterations (23,9% -> 43,9%)
+only small drops in between (at 20, after 45 and at 70 iterations)
+largest increase between 5 and 15 iterations
+very long training phase (~ 3 times the time cause 3 SVMs)
+TODO: look at false pos / false neg rates
+
+\section{Conclusion}
+
+combination of features is better
+more SVM training doesn’t provide always better results -> time/cost vs precision gain
+quality of the data might differ -> huge impact
+future work: more fetaures, try different feature combinations, filter for only relevant/high quality movies/data
+Spark provides nice interface and ML lib -> easy to use
+
 \section{Reference}
 
 
