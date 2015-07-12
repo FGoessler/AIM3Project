@@ -120,7 +120,7 @@ After getting the $\mathbf{w}$, given a new data point, denoted by $\mathbf{x}$
 
 % TODO: add graph from slides ?
 
-\par We started our experiments with using the plot descriptions and performed multiple runs with different number of learning iterations of the SVMs. We started with 5 training iterations and increased that number by 5 until we reached a maximum of 100 training iterations. After the plot descriptions we used other features of the movie to see whether we could do better. We also combined several features.
+\par We started our experiments with using the plot descriptions and performed multiple runs with different number of learning iterations of the SVMs. We started with 5 training iterations and increased that number by 5 until we reached a maximum of 100 training iterations. For every training and testing run 70 \% of the data was used for training and the remaining 30 \% were used for testing to see how good the learned models classify unseen data. After the plot descriptions we used other features of the movie to see whether we could do better. We also combined several features.
 
 \par The first approach was to use the plot description and transform it to a TF-IDF vector for each movie. For this approach we could use 249761 movies, which had a plot description as well as a genre label. We also tried to tune the IDF calculation by setting a min-doc-frequency. With this we could exclude words which do not appear in a minimum number of documents, but this seemed to not affect our results significantly so we didn't perform a detailed analysis of the effects of this parameter.
 
@@ -248,12 +248,14 @@ As in the previous two experiments the genres Drama, Comedy and Documentary were
 \par The only thing we couldn't do in neither Spark nor Flink, was the preprocessing of our data. Since it doesn't come in a simple format like CSV and also includes some headers we needed to perform some preprocessing via Python scripts and small Scala programs. 
 \par Our dataset wasn't real ‘Big Data’, although we crossed the giga-byte limit all calculations could be performed on a single consumer machine. Training and testing with all 3 features on the whole dataset took less than an hour on a recent quad-core machine with 16 GB of ram. But from an academic point of view it was very interesting to work with those ‘Big Data’ systems and get some hands-on experience with real data.
 
-\section{Reference}
+\section{References}
 
 TODO:
 Spark Docu
 Book from the Lecture
 IMDb
-Link the GitHub Repo - also write a Readme there
+
+\bigskip
+\par The code for this project as well as the raw data results data can be found on https://github.com/FGoessler/AIM3Project.
 
 \end{document}
