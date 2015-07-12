@@ -1,6 +1,8 @@
 #!/bin/bash
 declare -a arr=("Comedy" "Drama" "Action" "Documentary" "Adult" "Romance" "Thriller" "Animation" "Family" "Horror" "Music" "Crime" "Adventure" "Fantasy" "Sci-Fi" "Mystery" "Biography" "History" "Sport" "Musical" "War" "Western" "News" "Reality-TV")
 
+mkdir rescollected
+
 for i in `seq 0 5 100`;
 do
 	cat res$i/* > res$i.txt
