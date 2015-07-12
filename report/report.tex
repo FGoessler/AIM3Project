@@ -12,8 +12,8 @@ TODO: generalize intro (not only plot)
 \par The International Movie Database (IMDb) with its over 3 million listed titles provides a great resources for information about all sorts of movies. Maintaining this amount of data is quite challenging as new movies need to be added all the time.
 Although the data is in a multi GB space one would not necessarily consider it to be ‘Big Data’. Especially in comparison to things like Twitters continuous stream of data or even large scale sensor networks the IMDb is quite small and any analysis could probably be done with conventional systems. But for this academic project we wanted to try to build a scaleable solution, which could be easily adopted for other, larger data sources.
 
-\par For this project we decided to try a classification task on the available movie metadata to predict its genres. This could be helpful for people who enter information about new movies or also to complete the IMDb since there are about 300.000 movies without genre information.
-Part of this analysis it text classification which is a problem that occurs in many domains.
+\par For this project we decided to try a classification task on the available movie metadata to predict its genres. This could be helpful for people who enter information about new movies or also to complete the IMDb since there are a lot of movies without genre information.
+Part of this analysis is text classification which is a problem that occurs in many domains.
 
 \par For the genre classification it is also interesting whether it is possible to predict a genre in a reliable way. Often this task is challenging even for humans cause a genre itself doesn’t have formal specification and can be a bit fuzzy. There are also mixups of genres, like a tragic comedy, which might be hard to classify since they contain features of multiple genres. Evaluating whether a machine can learn sort of a formal definition in form of some model is interesting since a further analysis of the model could lead to formal, human understandable definition of a genre. It could solve the question of “What makes up a genre?”.
 
@@ -130,7 +130,7 @@ After getting the $\mathbf{w}$, given a new data point, denoted by $\mathbf{x}$
 
 \par As a final experiment we combined all 3 features. Therefore we constructed a set of 3 feature vectors - one for plot, one for keywords and one for actors - per movie. Now we trained 3 SVMs per genre - one for each feature vector. In the testing phase we feed the feature vectors to the SVMs and build a simple average over the results of all 3 SVMs per genre. Cause we could only use movies which provide valid feature vectors for all 3 features, we could only use a dataset of 39218 movies.
 
-\par For all experiments we tried to classify the movie in 24 genres. We didn’t consider the genre “Short” in our computation and analysis since it’s a very large and fuzzy genre which is basically only based on the length of a movie but the goal was to create a content related classification. Also the “genre” TODO only had one(?) movie in it was omitted cause of that.
+\par For all experiments we tried to classify the movie in 24 genres. We didn’t consider the genre “Short” in our computation and analysis since it’s a very large and fuzzy genre which is basically only based on the length of a movie but the goal was to create a content related classification. Also the genres Lifestyle, Erotica, Experimental, Commercial \& Film-Noir weren't used cause they only contained a very small number of movies - sometimes only one. The genres Game-Show and Talk-Show weren't used cause they are not classical movies in the sense of having a plot, professional actors etc..
 
 TODO: genre table
 
@@ -144,8 +144,6 @@ TODO: genre table
 
 \section{Results}
 
-TODO: explain “story”
-TODO: mention different data set sizes per feature/feature combination -> impact on results
 TODO: insert graphs for plot based
 
 \begin{figure}
@@ -197,25 +195,11 @@ As in the previous two experiments the genres Drama, Comedy and Documentary were
 \end{figure}
 
 \subsection{Combined Features}
-TODO:
-All 3 combined:
-significantly better results (up to 43,9 \%)
-significant increase with iterations (23,9 \% -> 43,9 \%)
-only small drops in between (at 20, after 45 and at 70 iterations)
-largest increase between 5 and 15 iterations
-very long training phase (~ 3 times the time cause 3 SVMs)
-
-error rates:
-comedy highest
-false negative very small - drama largest
-false positive: drama & documentary near average - only comedy much higher
-large improvements at the beginning
-zick-zack curves again - for drama and comedy
-
-Cause:
-better quality data/fewer movies with all features?
-Combination is actually better cause more diverse and precisce
-
+\par As a last experiment we combined all 3 features and averaged the results to obtain a classification per genre. This lead to significantly better result of up to 43.9 \% completely correctly classified movies. The disadvantage of this approach is the long training phase. For every feature and every genre the systems trains a different SVM, which leads to 72 SVMs that need to be trained.
+\par The rate of completely correctly classified movies increased significantly with the number of training iterations. The largest increase is from 5 to 15 iterations - going up from 23.9 \% to 37.3 \% - and after about 45 iterations it only increases a little. Similar to the plot based approach there are some small throwbacks at 20, after 45 and at 70 iterations but overall it still increases.
+\par The error rates are a lot better than for the single feature approaches, but still the genres Drama, Comedy and Documentary are outliers compared to the other genres. In this combined approach Drama isn't the worst genre anymore and provides a quite stable overall error rate. Now Comedy is the most difficult genre. The error rate of documentary improved so far that it is now below the average of the other genres. As expected the largest improvement happens within the first 20 iterations. Especially Comedy improves it's error rate from above 20 \% to below 14 \%.
+\par Looking at the false-positive and false-negative rates in detail shows some interesting phenomena. The false-negative rates for all genres except Drama (1.5 \% to 5 \%) are really low (< 0.5 \%) and increase only slightly with the increasing number of iterations. The false-positive rates for Drama and Documentary are quite similar or sometimes even below the average of the other genres. But Drama and Comedy have an alternating increase and decrease in the error rates similar to the curve of Drama for the plot based approach. For Drama the alternating pattern smoothes the overall error rate but for Comedy the false-positive rate is orders of magnitude larger than the false-negative rate so that this zick-zack pattern is still visible in the overall error rate.
+\par The reason for the zick-zack pattern isn't obvious and would need some more investigation. The results are much better than using just one feature at a time. By now we don't know whether this is due to an actual improved algorithm or just a better quality of the input data since we're only using movies that provide all 3 features and therefore we do not have so many training and testing samples.
 
 
 \begin{figure}
@@ -225,18 +209,25 @@ Combination is actually better cause more diverse and precisce
 \end{center}
 \end{figure}
 
+
+
 \section{Conclusion}
 
-TODO:
-drama, comedy & documentary always highest error - drama most false-negative, comedy most false positive -> 3 largest genres -> fuzziest/diffuse genres
-combination of features is better
-more SVM training doesn’t provide always better results -> time/cost vs precision gain
-quality of the data might differ -> huge impact
-future work: more fetaures, try different feature combinations, filter for only relevant/high quality movies/data, investigate zick-zack curves, investigate if better classification is actually cause of better method or just better data (run single feature versions only on the subset of data with all 3 features)
-Spark provides nice interface and ML lib -> easy to use
-preproccessing neccessary for spark (data format)
+\par Overall our implementation couldn't fulfill our goal of an reliable classification system for movie genres. We have seen some improvements by trying different features and especially using feature combinations seemed to work better.
+\par The quality of the data is an important factor for machine learning algorithms since bad, insufficient or even misclassified data can ruin the learned model. Having data with more features improves the quality of the prediction and this is one field for future work: Evaluating more features and also try to find out if the higher quality of the prediction with the combined features approach is caused by just looking only at movies with a high quality of features or actually by the number and combination of features. One first step in that direction would be to run the single feature approaches on the same subset of the data that the combined approach used.
+\par Seeing large error rates for, from a content perspective, very diverse and fuzzy genres like Drama, Comedy \& Documentary makes sense since they contain a large number of movies and even for humans it might e difficult by just looking at the provided features to decide for a genre classification.
+\par Working with SVMs as machine learning component worked out quite well and was easier to set up than Neural Networks, which we used in other projects. One should note that increasing the number of training iterations usually increases the precision but that doesn't always hold. After all one has to choose between the training time \& cost and the gain in precision. As we've seen with some of the zick-zack curves it is possible to end at a very suboptimal point on the curve.
+\par Those zick-zack curves are also one of the mysterious outcomes of our experiments and it would be interesting if this is due to properties of the SVM, of our features and how it behaves in the gaps between our 5 step iteration jumps. Unfortunately we didn't had time to investigate this.
+\par Using Apache Spark for our experiments was interesting and it's APIs proved their usefulness. The ML library provided everything we needed and was easy to use. We didn't encounter any bugs and coming from Apache Flink everything was quite self explaining. We also considered Apache Flink for this project but cause of it's unstable machine learning API which was also missing an IDF transformer at the beginning of this project we preferred Spark, which is more battle proven and therefor more useful for a project under heavy time pressure like this.
+\par The only thing we couldn't do in neither Spark nor Flink, was the preprocessing of our data. Since it doesn't come in a simple format like CSV and also includes some headers we needed to perform some preprocessing via Python scripts and small Scala programs. 
+\par Our dataset wasn't real big data, although we crossed the giga-byte limit all calculations could be performed on a single consumer machine. Training and testing with all 3 features on the whole dataset took less than an hour on a recent quad-core machine with 16 GB of ram. But from an academic point of view it was very interesting to work with those Big-Data systems and get some hands-on experience with real data.
 
 \section{Reference}
 
+TODO:
+Spark Docu
+Book from the Lecture
+IMDb
+Link the GitHub Repo - also write a Readme there
 
 \end{document}
