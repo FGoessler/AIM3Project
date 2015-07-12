@@ -7,15 +7,13 @@
 
 \section{Introduction}
 
-TODO: generalize intro (not only plot)
-
 \par The International Movie Database (IMDb) with its over 3 million listed titles provides a great resources for information about all sorts of movies. Maintaining this amount of data is quite challenging as new movies need to be added all the time.
-Although the data is in a multi GB space one would not necessarily consider it to be ‘Big Data’. Especially in comparison to things like Twitters continuous stream of data or even large scale sensor networks the IMDb is quite small and any analysis could probably be done with conventional systems. But for this academic project we wanted to try to build a scaleable solution, which could be easily adopted for other, larger data sources.
+\par Although the data is in a multi GB space one would not necessarily consider it to be ‘Big Data’. Especially in comparison to things like Twitters continuous stream of data or even large scale sensor networks the IMDb is quite small. Any analysis could probably be done with conventional systems. But for this academic project we wanted to try to build a scaleable solution, which could be easily adopted for other, larger data sources.
 
 \par For this project we decided to try a classification task on the available movie metadata to predict its genres. This could be helpful for people who enter information about new movies or also to complete the IMDb since there are a lot of movies without genre information.
 Part of this analysis is text classification which is a problem that occurs in many domains.
 
-\par For the genre classification it is also interesting whether it is possible to predict a genre in a reliable way. Often this task is challenging even for humans cause a genre itself doesn’t have formal specification and can be a bit fuzzy. There are also mixups of genres, like a tragic comedy, which might be hard to classify since they contain features of multiple genres. Evaluating whether a machine can learn sort of a formal definition in form of some model is interesting since a further analysis of the model could lead to formal, human understandable definition of a genre. It could solve the question of “What makes up a genre?”.
+\par For the genre classification it is also interesting whether it is possible to predict a genre in a reliable way. Often this task is challenging even for humans cause a genre itself doesn’t have formal specification and can be a bit fuzzy. There are also mixups of genres, like a tragic comedy, which might be hard to classify since they contain features of multiple genres. Evaluating whether a machine can learn sort of a formal definition in form of some model is interesting since a further analysis of the model could lead to a formal, human understandable definition of a genre. It could solve the question of “What makes up a genre?”.
 
 
 
@@ -120,24 +118,29 @@ After getting the $\mathbf{w}$, given a new data point, denoted by $\mathbf{x}$
 
 \section{Experiment}
 
-\par We started our experiments with using the plot descriptions and performed multiple runs with different number of learning iterations of the SVMs. After that we used other features of the movie to see whether we could do better. We also combined several features.
+% TODO: add graph from slides ?
 
-\par The first approach was to use the plot description and transform it to a TF-IDF vector for each movie. For this approach we could use 80033 movies, which had a plot description as well as a genre label. 
+\par We started our experiments with using the plot descriptions and performed multiple runs with different number of learning iterations of the SVMs. We started with 5 training iterations and increased that number by 5 until we reached a maximum of 100 training iterations. After the plot descriptions we used other features of the movie to see whether we could do better. We also combined several features.
 
-\par The second approach was to use keywords of the movies, which were explicitly assigned by the maintainers of the IMDb. This provides us a similar textual representation of the content of the movie but with the advantage of being already filtered by a human and also containing words that do not appear in a typical plot description but might describe the type of the movie quite well. We didn’t need to perform a TF-IDF transformation here since each keyword only appears once and we just constructed a vector per movie containing a 1 if it has a certain keyword and 0 if not. With this approach we could use 108224 movies, which provided a set of keywords and a genre label.
+\par The first approach was to use the plot description and transform it to a TF-IDF vector for each movie. For this approach we could use 80033 movies, which had a plot description as well as a genre label. We also tried to tune the IDF calculation by setting a min-doc-frequency. With this we could exclude words which do not appear in a minimum number of documents, but this seemed to not affect our results significantly so we didn't perform a detailed analysis of the effects of this parameter.
+
+\par The second approach was to use keywords of the movies, which were explicitly assigned by the maintainers of the IMDb. This provides us a similar textual representation of the content of the movie but with the advantage of being already filtered by a human and also containing words that do not appear in a typical plot description but might describe the type of  the movie quite well. We didn’t perform a TF-IDF transformation here and just constructed a vector per movie containing a 1 if it has a certain keyword and 0 if not. With this approach we could use 108224 movies, which provided a set of keywords and a genre label.
 
 \par The third approach was to create a connection between actors and the genre of movies they usually appear in. This feature isn’t content based at all but could be of significance cause we assume that most actors stick to one kind of genre during their carer. Similar to the keywords approach we didn’t use a TF-IDF transformation and just binary n-dimensional vector to represent the fact whether a actor appeared in the movie or not. Here we had a dataset of 218934 movies, which provided a list of actors as well as a genre label.
 
 \par As a final experiment we combined all 3 features. Therefore we constructed a set of 3 feature vectors - one for plot, one for keywords and one for actors - per movie. Now we trained 3 SVMs per genre - one for each feature vector. In the testing phase we feed the feature vectors to the SVMs and build a simple average over the results of all 3 SVMs per genre. Cause we could only use movies which provide valid feature vectors for all 3 features, we could only use a dataset of 39218 movies.
 
+\par See Figure \ref{fig:FeaturesAndGenresBarChart} for a comparison of the dataset sizes we were able to use for the different features.
+
 \par For all experiments we tried to classify the movie in 24 genres. We didn’t consider the genre “Short” in our computation and analysis since it’s a very large and fuzzy genre which is basically only based on the length of a movie but the goal was to create a content related classification. Also the genres Lifestyle, Erotica, Experimental, Commercial \& Film-Noir weren't used cause they only contained a very small number of movies - sometimes only one. The genres Game-Show and Talk-Show weren't used cause they are not classical movies in the sense of having a plot, professional actors etc..
 
-TODO: genre table
+TODO: genre table - check numbers for number of movies
 
 \begin{figure}
 \begin{center}
 \includegraphics[width=3.00in]{FeaturesAndGenresBarChart.png}
 \caption{number of movies with a certain feature and a genre labeling}
+\label{fig:FeaturesAndGenresBarChart}
 \end{center}
 \end{figure}
 
@@ -150,11 +153,12 @@ TODO: insert graphs for plot based
 \begin{center}
 \includegraphics[width=3.00in]{CCCM.png}
 \caption{completely correctly classified movies based on different features and different number of SVM traning iterations}
+\label{fig:CCCM}
 \end{center}
 \end{figure}
 
 \subsection{Plot Description Based}
-\par Using the plot description as the only feature wasn’t really successful. Although the portion of erroneous single classification operations was at around 6 \%, there were many movies which weren’t classified correctly. This is caused by the fact that we use 24 SVMs - one SVM for each genre. Most of these SVMs answer with a correct prediction - in most cases with “false”, cause a movie usually only belongs to 1 to 3 genres. But it is enough that one of those SVMs answers with a wrong value and the movie ends up misclassified.
+\par Using the plot description (see Figure \ref{fig:ErrorRatesPlot} for error rate graphs) as the only feature wasn’t really successful. Although the portion of erroneous single classification operations was at around 6 \%, there were many movies which weren’t classified correctly. This is caused by the fact that we use 24 SVMs - one SVM for each genre. Most of these SVMs answer with a correct prediction - in most cases with “false”, cause a movie usually only belongs to 1 to 3 genres. But it is enough that one of those SVMs answers with a wrong value and the movie ends up misclassified.
 \par Another interesting observation is that the amount of errors for the genres Drama, Comedy and Documentary is significantly higher than for other genres. Those 3 genres are the most common ones. One could expect that the SVMs are trained more precisely cause of a larger amount of positive training examples and a therefore more even distribution of negative and positive data points. But it seems like that the larger amount of movies in those genres leads to more diverse plot descriptions and a more fuzzy definition of the genre.
 \par When looking at the development of false-positive and false-negative classifications over increasing number of training iterations, one can see an overfitting(TODO: really overfitting?) of the model for Drama in alternating directions. With 5 iterations the false-positive rate is low and the false-negative rate is high, for 20 iterations the false-positive rate is high and the false-negative rate is low. The gap and error rate reduces with increasing number of training iterations but continues to be visible even at around 100 iterations.
 \par For most of the other genres false-positives aren’t an issue until 10 to 15 or even until 35 iterations. This is most likely due to the small amount of positive training examples which leads to strong tendency of always answering with no.
@@ -170,7 +174,7 @@ TODO: insert graphs for plot based
 
 
 \subsection{Keyword Based}
-\par In the next experiment we used the keywords as the only feature. The overall result was slightly better with 27.8 \% to 29.6 \% completely correctly classified movies.
+\par In the next experiment (see Figure \ref{fig:ErrorRatesKeywords})  we used the keywords as the only feature. The overall result was slightly better with 27.8 \% to 29.6 \% completely correctly classified movies.
 As for the plot based classification the genres Drama, Comedy and Documentary were the most difficult  ones to classify. With false-positive rates of 13 \% to 19 \%. All other genres had false-positive rates below 7 \%. 
 The false-positive rate for Comedy was higher than for all other genres. Interestingly the false negative rates were all below 2 \%, except for Drama which was between 10 \% and 11 \%. Nevertheless those rates were much better than for the plot based classification approach. For a higher number of iterations the same issue if increasing false-negatives rates were observable. The phenomena of alternating high and low false-negative and false-positive rates couldn’t be observed in this experiment.
 \par In the overall error rates Drama was the most difficult to classify (~24 \% error) followed by Comedy (~19 \%) and Documentary(~12 \%). All other genres where quite close and below 7 \% error rate. The error rate and also the rate of completely correctly classified movies did’t improve significantly with increasing number of iterations. Again most improvements in false-positives rates were neutralised by increasing false-negative rates. Only a small improvement between 5 and 20 iterations was notable. The most significant improvements were observable for the 3 difficult genres Drama, Comedy \& Documentary.
@@ -179,11 +183,12 @@ The false-positive rate for Comedy was higher than for all other genres. Interes
 \begin{center}
 \includegraphics[width=3.00in]{ErrorRatesKeywords.png}
 \caption{error rates for selected genres using keywords data as the only feature}
+\label{fig:ErrorRatesKeywords}
 \end{center}
 \end{figure}
 
 \subsection{Actors Based}
-\par The third experiment was to to only use the actors data as the feature vector. This experiment didn’t perform much better than the plot based classification and lead to nearly the same rate of completely correctly classified movies of about 24.8 \%.
+\par The third experiment (see Figure \ref{fig:ErrorRatesActors})  was to to only use the actors data as the feature vector. This experiment didn’t perform much better than the plot based classification and lead to nearly the same rate of completely correctly classified movies of about 24.8 \%.
 \par The error rates stayed nearly constant and also the rate of completely correctly classified movies didn’t change with an increasing number of training iterations. Cause of that this approach delivered better results for a low number of iterations and was faster in the training phase cause of a lower dimensionality of the feature vectors.
 As in the previous two experiments the genres Drama, Comedy and Documentary were the ones with the highest error rates.
 
@@ -191,11 +196,12 @@ As in the previous two experiments the genres Drama, Comedy and Documentary were
 \begin{center}
 \includegraphics[width=3.00in]{ActorsErrorRates.png}
 \caption{error rates for selected genres using actor data as the only feature}
+\label{fig:ErrorRatesActors}
 \end{center}
 \end{figure}
 
 \subsection{Combined Features}
-\par As a last experiment we combined all 3 features and averaged the results to obtain a classification per genre. This lead to significantly better result of up to 43.9 \% completely correctly classified movies. The disadvantage of this approach is the long training phase. For every feature and every genre the systems trains a different SVM, which leads to 72 SVMs that need to be trained.
+\par As a last experiment (see Figure \ref{fig:ErrorRatesCombined})  we combined all 3 features and averaged the results to obtain a classification per genre. This lead to significantly better result of up to 43.9 \% completely correctly classified movies. The disadvantage of this approach is the long training phase. For every feature and every genre the systems trains a different SVM, which leads to 72 SVMs that need to be trained.
 \par The rate of completely correctly classified movies increased significantly with the number of training iterations. The largest increase is from 5 to 15 iterations - going up from 23.9 \% to 37.3 \% - and after about 45 iterations it only increases a little. Similar to the plot based approach there are some small throwbacks at 20, after 45 and at 70 iterations but overall it still increases.
 \par The error rates are a lot better than for the single feature approaches, but still the genres Drama, Comedy and Documentary are outliers compared to the other genres. In this combined approach Drama isn't the worst genre anymore and provides a quite stable overall error rate. Now Comedy is the most difficult genre. The error rate of documentary improved so far that it is now below the average of the other genres. As expected the largest improvement happens within the first 20 iterations. Especially Comedy improves it's error rate from above 20 \% to below 14 \%.
 \par Looking at the false-positive and false-negative rates in detail shows some interesting phenomena. The false-negative rates for all genres except Drama (1.5 \% to 5 \%) are really low (< 0.5 \%) and increase only slightly with the increasing number of iterations. The false-positive rates for Drama and Documentary are quite similar or sometimes even below the average of the other genres. But Drama and Comedy have an alternating increase and decrease in the error rates similar to the curve of Drama for the plot based approach. For Drama the alternating pattern smoothes the overall error rate but for Comedy the false-positive rate is orders of magnitude larger than the false-negative rate so that this zick-zack pattern is still visible in the overall error rate.
@@ -206,21 +212,22 @@ As in the previous two experiments the genres Drama, Comedy and Documentary were
 \begin{center}
 \includegraphics[width=3.00in]{ErrorRatesCombined.png}
 \caption{error rates when using all 3 features at the same time for classification}
+\label{fig:ErrorRatesCombined}
 \end{center}
 \end{figure}
 
 
 
-\section{Conclusion}
+\section{Conclusion \& Future Work}
 
 \par Overall our implementation couldn't fulfill our goal of an reliable classification system for movie genres. We have seen some improvements by trying different features and especially using feature combinations seemed to work better.
-\par The quality of the data is an important factor for machine learning algorithms since bad, insufficient or even misclassified data can ruin the learned model. Having data with more features improves the quality of the prediction and this is one field for future work: Evaluating more features and also try to find out if the higher quality of the prediction with the combined features approach is caused by just looking only at movies with a high quality of features or actually by the number and combination of features. One first step in that direction would be to run the single feature approaches on the same subset of the data that the combined approach used.
-\par Seeing large error rates for, from a content perspective, very diverse and fuzzy genres like Drama, Comedy \& Documentary makes sense since they contain a large number of movies and even for humans it might e difficult by just looking at the provided features to decide for a genre classification.
+\par The quality of the data is an important factor for machine learning algorithms since bad, insufficient or even misclassified data can ruin the learned model. Having data with more features improves the quality of the prediction and this is one field for future work. Evaluating more features and also try to find out if the higher quality of the prediction with the combined features approach is caused by looking only at movies with a high quality of features or actually by the number and combination of features. One first step in that direction would be to run the single feature approaches on the same subset of the data that the combined approach used.
+\par Seeing large error rates for, from a content perspective, very diverse and fuzzy genres like Drama, Comedy \& Documentary makes sense since they contain a large number of movies and even for humans it might be difficult by just looking at the provided features to decide for a genre classification. For other more specific genres like Western or Fantasy the success rates were over 90 \% and based on that one could try to analyse the generated models to derive an answer to the question “What makes up a genre?”.
 \par Working with SVMs as machine learning component worked out quite well and was easier to set up than Neural Networks, which we used in other projects. One should note that increasing the number of training iterations usually increases the precision but that doesn't always hold. After all one has to choose between the training time \& cost and the gain in precision. As we've seen with some of the zick-zack curves it is possible to end at a very suboptimal point on the curve.
-\par Those zick-zack curves are also one of the mysterious outcomes of our experiments and it would be interesting if this is due to properties of the SVM, of our features and how it behaves in the gaps between our 5 step iteration jumps. Unfortunately we didn't had time to investigate this.
-\par Using Apache Spark for our experiments was interesting and it's APIs proved their usefulness. The ML library provided everything we needed and was easy to use. We didn't encounter any bugs and coming from Apache Flink everything was quite self explaining. We also considered Apache Flink for this project but cause of it's unstable machine learning API which was also missing an IDF transformer at the beginning of this project we preferred Spark, which is more battle proven and therefor more useful for a project under heavy time pressure like this.
+\par Those zick-zack curves are also a mysterious outcome of our experiments and it would be interesting if this is due to properties of the SVM or of our features and how it behaves in the gaps between our 5 step iteration jumps. Unfortunately we didn't had time to investigate this.
+\par Using Apache Spark for our experiments was interesting and it's APIs proved their usefulness. The ML library provided everything we needed and was easy to use. We didn't encounter any bugs and coming from Apache Flink everything was quite self explaining and similar, although they use quite different mechanisms under the hood. We also considered Apache Flink for this project but cause of it's unstable machine learning API, which was also missing an IDF transformer at the beginning of this project, we preferred Spark, which is more battle proven and therefor more useful for a project under heavy time pressure like this.
 \par The only thing we couldn't do in neither Spark nor Flink, was the preprocessing of our data. Since it doesn't come in a simple format like CSV and also includes some headers we needed to perform some preprocessing via Python scripts and small Scala programs. 
-\par Our dataset wasn't real big data, although we crossed the giga-byte limit all calculations could be performed on a single consumer machine. Training and testing with all 3 features on the whole dataset took less than an hour on a recent quad-core machine with 16 GB of ram. But from an academic point of view it was very interesting to work with those Big-Data systems and get some hands-on experience with real data.
+\par Our dataset wasn't real ‘Big Data’, although we crossed the giga-byte limit all calculations could be performed on a single consumer machine. Training and testing with all 3 features on the whole dataset took less than an hour on a recent quad-core machine with 16 GB of ram. But from an academic point of view it was very interesting to work with those ‘Big Data’ systems and get some hands-on experience with real data.
 
 \section{Reference}
 
