@@ -1,6 +1,6 @@
 # IMDb Movie Classification
 
-Study project by Florian Gößler (@FGoessler) & Xi Yang(@cici-debug) @ [TU Berlin](https://github.com/TU-Berlin-DIMA) for the course "Advanced Information Management 3 - Scaleable Data Analytics and Data Mining"
+Study project by Florian Gößler (@FGoessler) & Xi Yang(@cici-debug) @ [TU Berlin](https://github.com/TU-Berlin-DIMA) for the course ["Advanced Information Management 3 - Scaleable Data Analytics and Data Mining"](http://www.dima.tu-berlin.de/menue/studium_und_lehre/masterstudium/aim-3/)
 
 
 ## What is this about?
