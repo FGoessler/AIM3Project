@@ -166,8 +166,6 @@ War & 14992 & Western & 14722\\
 
 \section{Results}
 
-TODO: insert graphs for plot based
-
 \begin{figure}
 \begin{center}
 \includegraphics[width=3.00in]{CCCM.png}
@@ -179,7 +177,7 @@ TODO: insert graphs for plot based
 \subsection{Plot Description Based}
 \par Using the plot description (see Figure \ref{fig:ErrorRatesPlot} for error rate graphs) as the only feature wasn’t really successful. Although the portion of erroneous single classification operations was at around 6 \%, there were many movies which weren’t classified correctly. This is caused by the fact that we use 24 SVMs - one SVM for each genre. Most of these SVMs answer with a correct prediction - in most cases with “false”, cause a movie usually only belongs to 1 to 3 genres. But it is enough that one of those SVMs answers with a wrong value and the movie ends up misclassified.
 \par Another interesting observation is that the amount of errors for the genres Drama, Comedy and Documentary is significantly higher than for other genres. Those 3 genres are the most common ones. One could expect that the SVMs are trained more precisely cause of a larger amount of positive training examples and a therefore more even distribution of negative and positive data points. But it seems like that the larger amount of movies in those genres leads to more diverse plot descriptions and a more fuzzy definition of the genre.
-\par When looking at the development of false-positive and false-negative classifications over increasing number of training iterations, one can see a strong oscilation of the model for Drama. With 5 iterations the false-positive rate is low and the false-negative rate is high, for 20 iterations the false-positive rate is high and the false-negative rate is low. The gap and error rate reduces with increasing number of training iterations but continues to be visible even at around 100 iterations.
+\par When looking at the development of false-positive and false-negative classifications over increasing number of training iterations, one can see a strong oscillation of the model for Drama. With 5 iterations the false-positive rate is low and the false-negative rate is high, for 20 iterations the false-positive rate is high and the false-negative rate is low. The gap and error rate reduces with increasing number of training iterations but continues to be visible even at around 100 iterations. A similar pattern can be sen for the Comedy genre, although the oscillation isn't that distinctive.
 \par For most of the other genres false-positives aren’t an issue until 10 to 15 or even until 35 iterations. This is most likely due to the small amount of positive training examples which leads to strong tendency of always answering with no.
 \par The false-negative rates are quite stable with in most cases a slight tendency to a lower error rate, but there are also some genres like Romance which have a constant increase in the error rate with increasing number of iterations. The most significant improvements can be seen between 0 and 25 iterations.
 \par If we look at the overall error rate there’s usually an improvement with increasing number of training iterations. It seems to be stable after around 50 iterations. An reduction of false-negatives is often consumed by an increase in false-positives, leading to nearly horizontal lines for some genres. The alternating false-negatives and false-positives for genres like Drama or Comedy even themselves out and lead to a continuous curve in the total error rate.
@@ -191,6 +189,13 @@ TODO: insert graphs for plot based
 \item {For reasonable results one can stop training after around 50 iterations.}
 \end{itemize}
 
+\begin{figure}
+\begin{center}
+\includegraphics[width=3.00in]{ErrorRatesPlot.png}
+\caption{error rates for selected genres using plot descriptions as the only feature}
+\label{fig:ErrorRatesPlot}
+\end{center}
+\end{figure}
 
 \subsection{Keyword Based}
 \par In the next experiment (see Figure \ref{fig:ErrorRatesKeywords})  we used the keywords as the only feature. The overall result was slightly better with 27.8 \% to 29.6 \% completely correctly classified movies.
