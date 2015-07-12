@@ -5,8 +5,13 @@ import scala.io.Source
 
 object ActorsConverter {
   def main(args: Array[String]): Unit = {
-    val lines = Source.fromFile(new java.io.File("/data/home/fgoessler/actors.list"), "ISO-8859-1").getLines()
-    val out = new java.io.PrintWriter(new java.io.File("/data/home/fgoessler/actors-converted.list"))
+    if(args.length < 2) {
+      println("Please specify an input and output path! Format: <input> <output>")
+      return
+    }
+
+    val lines = Source.fromFile(new java.io.File(args(0)), "ISO-8859-1").getLines()
+    val out = new java.io.PrintWriter(new java.io.File(args(1)))
 
     var curActor = ""
     for (l <- lines) {
