@@ -16,7 +16,7 @@ We're using [Apache Spark](https://spark.apache.org) and data from the [Internat
 2. Download the IMDb datasets. You have two options:
     - Download from [IMDb](http://www.imdb.com/interfaces) directly and preprocess it yourself (see convert the data below).
     OR:
-    - Download already preprocessed data from our public Dropbox folder (Link comes soon)
+    - Download already preprocessed data from our [public Dropbox folder](https://www.dropbox.com/sh/k7sbl2b707wpf21/AADhU4Q-K-6RWDCUGHzN9SBka?dl=0)
 3. Run the program via maven exec ```mvn exec:java -Dexec.mainClass=de.tuberlin.dima.aim3.project.IMDbMovieClassification```. For available command line options see below or run it with ```--help```.
  
  
