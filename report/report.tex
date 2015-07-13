@@ -19,43 +19,52 @@ Part of this analysis is text classification which is a problem that occurs in m
 
 \section{Problem Statement}
 \subsection{Background}
-Movie genres are manually created categorical labels to characterize different movies. These genre labels can be used to describe the movie, contribute in movie recommendation based on the domain specified interests and some other fields. Currently the movie genres annotation are determined by us. The complexity in automatic genre classification is caused by the fact that usually the genres are not well  defined. Normally there are no strict definitions or boundaries between 2 different genres.  And of cause they share certain overlapping characteristics.
+Movie genres are manually created categorical labels to characterize different movies. These genre labels can be used to describe the movie, contribute in movie recommendation based on the domain specified interests and some other fields. Currently the movie genres annotation are determined by human beings. The complexity in automatic genre classification is caused by the fact that usually the genres are not well  defined. Normally there are no strict definitions or boundaries between 2 different genres.  And of cause they share certain overlapping characteristics.
 \par Facing the fact that the number of movie is growing at a fast pace, automatic movie genres classification can assist or replace the human work in this process and provide important component for the complete movie information and in addition, structure the movie based on the genres. Thus, we begin to think about: what kind of information is sufficient to automatically classify the movie and how to approach that?
-\par After considering our requirement and all the related movie information component, We decide to focus on building a scalable movie genre classification system based on their plot description. 
+\par Thus, our project is aimed to building a scalable movie genre classification system using Internet Movie Database(IMDb) and compare the results using different features like plot description, actor and key words. 
 
 \subsection{Dataset} 
-Dataset:The dataset we use is the publicly available data from the Internet Movie Database(IMDb). IMDb is an online dataset which provides information related to movies, television programs and video games. The information includes actors, production crew and fictional characters featured in these. There are some publicly available datasets containing a subset of the online database, which can be downloaded and processed. 
-\par The dataset is organized into a set of compressed text files, where each file contains information on a specific aspect. The files we use are the plot.list and genres.list files and the size is more than 400MB. It contains all the plot description, genre information we need and is big enough to test the scalability.
+The dataset we use is the publicly available data from the Internet Movie Database(IMDb). IMDb is an online dataset which provides all kinds of information related to movies. The information includes actors, production crew, fictional characters featured in these and so on. There are some publicly available datasets containing a subset of the online database, which can be downloaded and processed. 
+\par The dataset is organized into a set of compressed text files, where each file contains information on a specific aspect. The 4 main files we use are genres.list, plot.list, actors.list and keywords.list. The size of the total files is about 1.7GB. Although is not big enough to be considered as "big data", but it is easy to adopted for larger data.
 \subsection{Tools}
-\par Python: Python is a fast and friendly language. It’s easy to learn and can work everywhere. The raw data from IMDb can not be used directly, so we choose Python to do the preprocessing work and generate processed data for the next steps.
-\par Apache Spark: Spark is an open source Apache project built around speed, ease of use. It provides a faster and more general data processing platform. Spark enables we to quickly write applications in Java, Scala, or Python. It comes with a built-in set of over 80 high-level operators. And we can use it interactively to query data within the shell. Other than Spark Core API, there are additional libraries that are part of the Spark ecosystem and provide additional capabilities in Big Data analytics and Machine Learning areas. The scalable machine learning library consisting of common learning algorithms and utilities, including classification, regression, clustering, collaborative filtering, dimensionality reduction, as well as underlying optimization primitives.
+\par To choose suitable tools, we need to meet the following requirements:
+\begin{itemize}
+\item {Easy and convinient way to preprocess the raw data to get formatted data}
+\item {Scalable data process framwork with suited machine learning algorithms}
+\end{itemize}
+\par By comparing the advantages and disadvantaged, we deceide to use these tools:
+\par Python: Python is a fast and friendly language. It’s easy to learn, can work everywhere and take much less time to develop. Python is an excellent tool for scanning and manipulating textual data. The raw data from IMDb can not be used directly, so we choose Python to do the preprocessing work and generate processed data for the next steps. 
+\par Apache Spark: Spark is an open source Apache project built around speed, ease of use. It provides a faster and more general data processing platform. Spark enables we to quickly write applications in Java, Scala, or Python. It comes with a built-in set of over 80 high-level operators. Other than Spark Core API, there are additional libraries that are part of the Spark ecosystem and provide additional capabilities in big data analytics and machine learning areas. The scalable machine learning library consisting of common learning algorithms and utilities, including classification, regression, clustering, collaborative filtering, dimensionality reduction, as well as underlying optimization primitives.
 
 \section{Methodology}
 \subsection{Apache Spark Pipeline}
-In machine learning, it is common to run a sequence of algorithms to process and learn from the data, a regular text document processing workflow might include several steps like:
+In machine learning, it is common to run a sequence of algorithms to process and learn from the data, a regular text document processing workflow might include several steps:
 \begin{itemize}
 \item {Split the document into words.}
 \item {Convert each document's words into a numerical feature vector.}
 \item {Learn a prediction model using the feature vectors and labels.}
 \end{itemize}
-\par Spark ML represents such a workflow as a Pipeline, which consists of a sequence of PipelineStages (each stage is either a Transformer or an Estimator) to be run in a specific order. The input dataset is modified as it passes through each stage. For Transformer stages, the transform() method is called on the dataset. For Estimator stages, the fit() method is called to produce a Transformer (which becomes part of the PipelineModel, or fitted Pipeline), and that Transformer’s transform() method is called on the dataset.
-\par This figure shows the 3-stage pipeline we used in the project. These 3 stages are all transformers.  Each stage’s transform() method updates the dataset and passes it to the next stage. The bottom row represents data flowing through the pipeline, where cylinders indicate DataFrames. The Tokenizer.transform() method splits the raw text documents into words, adding a new column with words into the dataset. The HashingTF.transform() and idf.transform() method converts the words column into feature vectors, adding a new column with those vectors to the dataset. Then SVM.train() is called to produce a SVMModel. After that the pipeline calls SVM.predict() method on the dataset and predict the result.
+\par Spark ML represents such a workflow as a Pipeline, which consists of a sequence of PipelineStages (each stage is either a Transformer or an Estimator) to be run in a specific order. For Transformer stages, the transform() method is called on the dataset and he input dataset is modified as it passes through each stage.   For Estimator stages, the fit() method is called to produce a Transformer (which becomes part of the PipelineModel, or fitted Pipeline), and that Transformer’s transform() method is then called on the dataset.
+\par Figure 1 shows the 3-stage pipeline we used in the project. These 3 stages are all transformers.  Each stage’s transform() method updates the dataset and passes it to the next stage. The bottom row represents data flowing through the pipeline, where cylinders indicate DataFrames. The Tokenizer.transform() method splits the raw text documents into words, adding a new column with words into the dataset. The feature extraction stage converts the words column into feature vectors, adding a new column with those vectors to the dataset. Then SVM.train() is called to produce a SVMModel. After that the pipeline calls SVM.predict() method on the dataset and predict the result.
 \begin{figure}
 \begin{center}
-\includegraphics[width=3.50in]{AIM3-pipeline.png}
+\includegraphics[width=3.50in]{pipeline.png}
 \caption{movie genres classification pipeline}
 \end{center}
 \end{figure}
+\par In feature extraction stage, we use different feature extraction methods for the 3 different input data (plot, actors and key words). For plot input, HashingTF() and IDF() is applied to generate the feature vectors. For the rest 2 kinds of input data, since there are no duplicated words, we simply use binary n-vectors to represent whether a actor(or key word) appears.
 \subsection{Preprocessing}
-\par To get start, we first use Tableau to get a insight of the dataset. 
+\par To get start, we first use Tableau to get a insight of the dataset and see what genres we are deeling with. Figure 2 shows the contribution of all the movie genres. We can easily see that drama, comedy and documentary have the maximum number of movies, almost 3 times of the rest genres. This means for those 3 genres, there are much more input data to train the corresponding SVM models. This may increase the classification accuracy. On the other hand, the large quantity means the scope for these 3 genres are much larger, which means are not much common similarity inside each scope, leading to decrease the accuracy.
 \begin{figure}
 \begin{center}
-\includegraphics[width=3.00in]{tableau.png}
+\includegraphics[width=3.00in]{genresContribution.png}
 \caption{insight of the data using Tableau}
 \end{center}
-\end{figure}
+\end{figure} 
+\par Another part of preprocessing is to scan the raw data and get the formatted data input for the Spark pipeline. This is done by a few lines of Python script.
 \subsection{Feature Extraction}
-Term frequency-inverse document frequency (TF-IDF) is a feature vectorization method that is intended to reflect how important a word is to a document in a collection of the corpus. The tf-idf value increases probability to the number of times a word appears in the document, but is offset by the frequency of the word in the corpus, which helps to adjust for the fact that some words appear more frequently in general.
+\par In the process of plot description, we use TF-IDF to vecterize the feature.
+\par Term frequency-inverse document frequency (TF-IDF) is a feature vectorization method that is intended to reflect how important a word is to a document in a collection of the corpus. The tf-idf value increases probability to the number of times a word appears in the document, but is offset by the frequency of the word in the corpus, which helps to adjust for the fact that some words appear more frequently in general but provides few information.
 \par Denote a term by $t$, a document by $d$, and the corpus by $D$. Term frequency $TF(t,d)$ is the number of times term $t$ appears in document $d$, while the document frequency $DF(t,D)$ is the number of documents that contain term $t$ in corpus $D$. However, if we only use term frequency, for some common words, like "the", it will tend to incorrectly emphasize the documents which happen to use "the" more frequently. But these kind of words can't provide enough information to distinguish relevant and non-relevant documents and terms. If a term appears very often across the corpus, it means it doesn’t carry special information about a particular document. Thus, we use inverse document frequency, a numerical measure to show how much information a term carries:
 \begin{displaymath}
 IDF(t,D) = \log\frac{|D|+1}{DF(t,D)+1},
@@ -68,7 +77,7 @@ TFIDF(t,d,D)=TF(t,d)⋅IDF(t,D).
 \par By using tf-idf, we generate a vector for every plot description.
 
 \subsection{Classification}
-In machine learning, support vector machines(SVMs) are supervised learning models used for classification and regression analysis. Given a set of training examples, each marked for belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples into one category or the other, making it a non-probabilistic binary linear classifier. 
+In machine learning, support vector machines(SVMs) are supervised learning models used for binary classification and regression analysis. Given a set of training examples, each marked for belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples into one category or the other, making it a non-probabilistic binary linear classifier. 
 \par An SVM model constructs a hyperplane in high(or infinite)dimensional space, which can be used for classification, regression, or other tasks. Intuitively, a good separation is achieved by the hyperplane that has the largest distance to the nearest training-data point of any class (so-called functional margin), since in general the larger the margin the lower the generalization error of the classifier.
 \par Given some training dataset $\mathcal{D}$ containing $n$ points：
 \begin{displaymath}
@@ -98,7 +107,7 @@ and
 \begin{displaymath}
 \begin{cases}
 \mathbf{w}\cdot\mathbf{x}-b\ge1,y_i=1\\
-\mathbf{w}\cdot\mathbf{x}-b\le-1,y_1=-1\\
+\mathbf{w}\cdot\mathbf{x}-b\le-1,y_i=-1\\
 \end{cases}
 \end{displaymath}
 This can be written as:
@@ -113,7 +122,8 @@ subject to (for any $i = 1,...,n$)
 \begin{displaymath}
 y_i(\mathbf{w}\cdot\mathbf{x}_i-b)\ge1
 \end{displaymath}
-After getting the $\mathbf{w}$, given a new data point, denoted by $\mathbf{x}$
+\par After getting the $\mathbf{w}$, given a new data point, denoted by $\mathbf{x}$, the model makes predictions based on the value of $\mathbf{w}\mathbf{x}$. By the defalut, if $\mathbf{w}\mathbf{x} \ge 0$, the outcome is positive, otherwise negative. 
+\par For all the 24 genres, we need to build a SVM model for every genre and predict every genre seperately.
 
 
 \section{Experiment}
