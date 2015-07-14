@@ -34,7 +34,7 @@ The dataset we use is the publicly available data from the Internet Movie Databa
 \end{itemize}
 \par By comparing the advantages and disadvantaged, we decided to use these tools:
 \par Python: Python is a fast and friendly language. It's easy to learn, can work everywhere and it takes much less time to develop with it. Python is an excellent tool for scanning and manipulating textual data. The raw data from IMDb cannot be used directly, so we choose Python to do the preprocessing work and generate formatted data for the next steps. 
-\par Apache Spark: Spark is an open source Apache project built around scaleability, speed and ease of use. It provides a fast and generic data processing platform. Spark enables us to quickly write applications in Java, Scala, or Python. It comes with a built-in set of over 80 high-level operators. Other than Spark Core API, there are additional libraries that are part of the Spark ecosystem and provide advanced capabilities for big data analytics and machine learning. The scalable machine learning library consists of common learning algorithms and utilities, including classification, regression, clustering, collaborative filtering, dimensionality reduction, as well as underlying optimisation primitives.
+\par Apache Spark \cite{spark}: Spark is an open source Apache project built around scaleability, speed and ease of use. It provides a fast and generic data processing platform. Spark enables us to quickly write applications in Java, Scala, or Python. It comes with a built-in set of over 80 high-level operators. Other than Spark Core API, there are additional libraries that are part of the Spark ecosystem and provide advanced capabilities for big data analytics and machine learning. The scalable machine learning library consists of common learning algorithms and utilities, including classification, regression, clustering, collaborative filtering, dimensionality reduction, as well as underlying optimisation primitives.
 
 \section{Methodology}
 
@@ -45,7 +45,7 @@ In machine learning, it is common to run a sequence of algorithms to process and
 \item {Convert each document's words into a numerical feature vector.}
 \item {Learn a prediction model using the feature vectors and labels.}
 \end{itemize}
-\par Spark ML represents such a workflow as a Pipeline, which consists of a sequence of PipelineStages (each stage is either a Transformer or an Estimator) to be run in a specific order. For Transformer stages, the transform() method is called on the dataset and the input dataset is modified as it passes through each stage. For Estimator stages, the fit() method is called to produce a Transformer (which becomes part of the PipelineModel, or fitted Pipeline), and that Transformer's transform() method is then called on the dataset.
+\par Spark ML\cite{sparkml} represents such a workflow as a Pipeline, which consists of a sequence of PipelineStages (each stage is either a Transformer or an Estimator) to be run in a specific order. For Transformer stages, the transform() method is called on the dataset and the input dataset is modified as it passes through each stage. For Estimator stages, the fit() method is called to produce a Transformer (which becomes part of the PipelineModel, or fitted Pipeline), and that Transformer's transform() method is then called on the dataset.
 \par Figure \ref{fig:pipeline} shows the 3-stage pipeline we used in the project. These 3 stages are all transformers.  Each stage's transform() method updates the dataset and passes it to the next stage. The bottom row represents data flowing through the pipeline, where cylinders indicate DataFrames. The Tokenizer.transform() method splits the raw text documents into words, adding a new column with words into the dataset. The feature extraction stage converts the words column into feature vectors, adding a new column with those vectors to the dataset. Then SVM.train() is called with the training data set to produce a SVMModel. After that this model can be used to predict a classification on items of the testing dataset via the predict() method.
 \begin{figure}
 \begin{center}
@@ -68,7 +68,7 @@ In machine learning, it is common to run a sequence of algorithms to process and
 
 
 \subsection{Feature Extraction}
-\par In the process of plot description, we use TF-IDF to vecterize the feature.
+\par In the process of plot description, we use TF-IDF\cite{mining} to vecterize the feature.
 \par Term frequency-inverse document frequency (TF-IDF) is a feature vectorization method that is intended to reflect how important a word is to a document in a collection of the corpus. The tf-idf value increases probability to the number of times a word appears in the document, but is offset by the frequency of the word in the corpus, which helps to adjust for the fact that some words appear more frequently in general but provides few information.
 \par Denote a term by $t$, a document by $d$, and the corpus by $D$. Term frequency $TF(t,d)$ is the number of times term $t$ appears in document $d$, while the document frequency $DF(t,D)$ is the number of documents that contain term $t$ in corpus $D$. However, if we only use term frequency, for some common words, like "the", it will tend to incorrectly emphasise the documents which happen to use "the" more frequently. But these kind of words can't provide enough information to distinguish relevant and non-relevant documents and terms. If a term appears very often across the corpus, it means it doesn't carry special information about a particular document. Thus, we use inverse document frequency, a numerical measure to show how much information a term carries:
 \begin{displaymath}
@@ -83,7 +83,7 @@ TFIDF(t,d,D)=TF(t,d)⋅IDF(t,D).
 
 
 \subsection{Classification}
-In machine learning, support vector machines(SVMs) are supervised learning models used for binary classification and regression analysis. Given a set of training examples, each marked for belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples into one category or the other, making it a non-probabilistic binary linear classifier. 
+In machine learning, support vector machines(SVMs)\cite{mining} are supervised learning models used for binary classification and regression analysis. Given a set of training examples, each marked for belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples into one category or the other, making it a non-probabilistic binary linear classifier. 
 \par An SVM model constructs a hyperplane in high(or infinite)dimensional space, which can be used for classification, regression, or other tasks. Intuitively, a good separation is achieved by the hyperplane that has the largest distance to the nearest training-data point of any class (so-called functional margin), since in general the larger the margin the lower the generalization error of the classifier.
 \par Given some training dataset $\mathcal{D}$ containing $n$ points：
 \begin{displaymath}
@@ -280,18 +280,18 @@ As in the previous two experiments the genres Drama, Comedy and Documentary were
 \par Seeing large error rates for, from a content perspective, very diverse and fuzzy genres like Drama, Comedy \& Documentary makes sense since they contain a large number of movies and even for humans it might be difficult by just looking at the provided features to decide for a genre classification. For other more specific genres like Western or Fantasy the success rates were over 90 \% and based on that one could try to analyse the generated models to derive an answer to the question "What makes up a genre?".
 \par Working with SVMs as machine learning component worked out quite well and was easier to set up than Neural Networks, which we used in other projects. One should note that increasing the number of training iterations usually increases the precision but that doesn't always hold. After all one has to choose between the training time \& cost and the gain in precision. As we've seen with some of the zick-zack curves it is possible to end at a very suboptimal point on the curve.
 \par Those zick-zack curves are also a mysterious outcome of our experiments and it would be interesting if this is due to properties of the SVM or of our features and how it behaves in the gaps between our 5 step iteration jumps. Unfortunately we didn't had time to investigate this.
-\par Using Apache Spark for our experiments was interesting and it's APIs proved their usefulness. The ML library provided everything we needed and was easy to use. We didn't encounter any bugs and coming from Apache Flink everything was quite self explaining and similar, although they use quite different mechanisms under the hood. We also considered Apache Flink for this project but cause of it's unstable machine learning API, which was also missing an IDF transformer at the beginning of this project, we preferred Spark, which is more battle proven and therefore more useful for a project under heavy time pressure like this.
+\par Using Apache Spark for our experiments was interesting and it's APIs proved their usefulness. The ML library provided everything we needed and was easy to use. We didn't encounter any bugs and coming from Apache Flink\cite{flink} everything was quite self explaining and similar, although they use quite different mechanisms under the hood. We also considered Apache Flink for this project but cause of it's unstable machine learning API, which was also missing an IDF transformer at the beginning of this project, we preferred Spark, which is more battle proven and therefore more useful for a project under heavy time pressure like this.
 \par The only thing we couldn't do in neither Spark nor Flink, was the preprocessing of our data. Since it doesn't come in a simple format like CSV and also includes some headers we needed to perform some preprocessing via Python scripts and small Scala programs. 
 \par Our dataset wasn't real 'Big Data', although we crossed the giga-byte limit all calculations could be performed on a single consumer machine. Training and testing with all 3 features on the whole dataset over 100 iterations took less than an hour on a recent quad-core machine with 16 GB of ram. But from an academic point of view it was very interesting to work with those 'Big Data' systems and get some hands-on experience with real data and build a scaleable solution.
 
 
 \begin{thebibliography}{9} 
-\bibitem{imdb} \emph{Internet Movie Database}, www.imdb.com
+\bibitem{imdb} \emph{Internet Movie Database}, http://www.imdb.com
+\bibitem{spark} \emph{Apache Spark 1.4.0}, http://spark.apache.org/docs/1.4.0/
+\bibitem{sparkml} \emph{Apache Spark MLlib}, http://spark.apache.org/docs/1.4.0/mllib-guide.html
+\bibitem{mining} Leskovec, Jure, Anand Rajaraman, and Jeffrey David Ullman. \emph{Mining of massive datasets.} Cambridge University Press, 2014.
+\bibitem{flink} \emph{Apache Flink}, http://flink.apache.org
 \end{thebibliography}
-
-TODO:
-Spark Docu
-Book from the Lecture
 
 \bigskip
 \par The code for this project as well as the raw result data can be found on https://github.com/FGoessler/AIM3Project.
