@@ -142,8 +142,9 @@ subject to (for any $i = 1,...,n$)
 y_i(\mathbf{w}\cdot\mathbf{x}_i-b)\ge1
 \end{displaymath}
 \par After getting the $\mathbf{w}$, given a new data point, denoted by $\mathbf{x}$, the model makes predictions based on the value of $\mathbf{w}\mathbf{x}$. By the default, if $\mathbf{w}\mathbf{x} \ge 0$, the outcome is positive, otherwise negative. 
-\par For all the 24 genres, we need to build a SVM model for every genre and predict every genre separately.
 
+\par Since SVMs only perform a binary classification but we have the requirement to classify movies into multiple genres we trained one SVM per genre and feature. Our internal model of a movie therefore consists of 3 parts: its title, a 24 dimensional binary vector with the genre information from the IMDb and array of n-dimensional feature vectors - one vector for each feature. Thus we trained 24 SVMs per feature vector. If we use more than one feature at a time we needed to train even more SVMs.
+\par In the testing phase the SVMs were used to generate a predicted 24 dimensional genre vector, which then could be compared to the original genre vector derived from the explicit labeling in the IMDb data. Only if both vectors are identical a movie is considered to be completely correctly classified.
 
 \section{Experiment}
 
