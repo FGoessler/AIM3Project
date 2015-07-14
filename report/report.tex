@@ -42,13 +42,20 @@ IMDb is an online dataset which provides all kinds of information related to mov
 \section{Methodology}
 
 \subsection{Approach}
-In machine learning, it is common to run a sequence of algorithms to process and learn from the data. A regular text document processing workflow might include the following steps:
-\par TODO: complete overview
+\par For this data analysis task we decided to follow a multi step approach and build a machine learning pipeline using Apache Spark.
+\par We started our work with some manual exploration of the data. After that we had to do some preprocessing to get the raw data into a format that could be used by Spark.
+\par Based on this preprocessed data and the insight we got about the data we started to construct the pipeline which consists of the following steps:
+
 \begin{itemize}
-\item {Split the document into words.}
-\item {Convert each document's words into a numerical feature vector.}
+\item {Load the raw data.}
+\item {Split textual documents into words.}
+\item {Convert those word vectors into a numerical feature vectors.}
 \item {Learn a prediction model using the feature vectors and labels.}
+\item {Use the learned model to classify unseen data points.}
+\item {Evaluate those classifications.}
 \end{itemize}
+
+\par Of course there are a lot of tuning possibilities and variations in the generation of features which we will discuss in the experiments section.
 
 \subsection{Exploration}
 \par To get started, we had a look at the IMDb website itself. That way we could look at some random data points in a nicely formatted way and could evaluate which features we could use for our analysis and also how those features are structured. 
