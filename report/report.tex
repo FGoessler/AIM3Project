@@ -7,7 +7,7 @@
 
 \section{Introduction}
 
-\par The International Movie Database (IMDb) with its over 3 million listed titles provides a great resources for information about all sorts of movies. Maintaining this amount of data is quite challenging as new movies need to be added all the time.
+\par The International Movie Database (IMDb) \cite{imdb} with its over 3 million listed titles provides a great resources for information about all sorts of movies. Maintaining this amount of data is quite challenging as new movies need to be added all the time.
 \par Although the data is in a multi GB space one would not necessarily consider it to be 'Big Data'. Especially in comparison to things like Twitters continuous stream of data or large scale sensor networks the IMDb is quite small. Any analysis could probably be done with conventional systems. But for this academic project we wanted to try to build a scaleable solution, which could be easily adopted for other, larger data sources.
 
 \par For this project we decided to try a classification task on the available movie metadata to predict the genres of the movie. This could be helpful for people who enter information about new movies or also to complete the IMDb since there are a lot of movies without genre information.
@@ -278,12 +278,14 @@ As in the previous two experiments the genres Drama, Comedy and Documentary were
 \par The only thing we couldn't do in neither Spark nor Flink, was the preprocessing of our data. Since it doesn't come in a simple format like CSV and also includes some headers we needed to perform some preprocessing via Python scripts and small Scala programs. 
 \par Our dataset wasn't real 'Big Data', although we crossed the giga-byte limit all calculations could be performed on a single consumer machine. Training and testing with all 3 features on the whole dataset over 100 iterations took less than an hour on a recent quad-core machine with 16 GB of ram. But from an academic point of view it was very interesting to work with those 'Big Data' systems and get some hands-on experience with real data and build a scaleable solution.
 
-\section{References}
+
+\begin{thebibliography}{9} 
+\bibitem{imdb} \emph{International Movie Database}, www.imdb.com
+\end{thebibliography}
 
 TODO:
 Spark Docu
 Book from the Lecture
-IMDb
 
 \bigskip
 \par The code for this project as well as the raw data results data can be found on https://github.com/FGoessler/AIM3Project.
