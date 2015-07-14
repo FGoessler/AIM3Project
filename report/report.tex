@@ -77,12 +77,11 @@ TODO(Xi): graph with larger labels
 \end{center}
 \end{figure}
 \par In the feature extraction stage, we use different feature extraction methods for the 3 different input data categories (plot, actors and key words). For plot input, HashingTF() and IDF() is applied to generate the feature vectors. For the other 2 kinds of input data, since there are no duplicated words, we simply use binary n-dim-vectors to represent whether a actor(or key word) appears or not.
-\subsection{Preprocessing}
 
 
 \subsection{Feature Extraction}
-\par In the process of plot description, we use TF-IDF\cite{mining} to vecterise the feature.
-\par Term frequency-inverse document frequency (TF-IDF) is a feature vectorisation method that is intended to reflect how important a word is to a document in a collection of the corpus. The tf-idf value increases probability to the number of times a word appears in the document, but is offset by the frequency of the word in the corpus, which helps to adjust for the fact that some words appear more frequently in general but provide few information.
+\par For the plot description based classification, we used TF-IDF\cite{mining} to vectorise the feature.
+\par Term frequency-inverse document frequency (TF-IDF) is a feature vectorisation method that is intended to reflect how important a word is to a document in a collection of the corpus. The TF-IDF value increases probability to the number of times a word appears in the document, but is offset by the frequency of the word in the corpus, which helps to adjust for the fact that some words appear more frequently in general but provide few information.
 \par Denote a term by $t$, a document by $d$, and the corpus by $D$. Term frequency $TF(t,d)$ is the number of times term $t$ appears in document $d$, while the document frequency $DF(t,D)$ is the number of documents that contain term $t$ in corpus $D$. However, if we only use term frequency, for some common words, like "the", it will tend to incorrectly emphasise the documents which happen to use "the" more frequently. But these kind of words can't provide enough information to distinguish relevant and non-relevant documents and terms. If a term appears very often across the corpus, it means it doesn't carry special information about a particular document. Thus, we use inverse document frequency, a numerical measure to show how much information a term carries:
 \begin{displaymath}
 IDF(t,D) = \log\frac{|D|+1}{DF(t,D)+1},
@@ -92,7 +91,7 @@ where $|D|$ is the number of documents in the corpus. Since a logarithm is used 
 TFIDF(t,d,D)=TF(t,d)⋅IDF(t,D).
 \end{displaymath} 
 \par In the implementation of TF-IDF in the Apache Spark machine learning library, a raw feature is mapped into an index(term) by using a hashing function. Then term frequency is calculated based on the mapped indices. This approach avoids the need to compute a global term-to-index map, which can be expensive for a large corpus, but it suffers from potential hash collisions, where different raw features may become the same term after hashing. To reduce the chance of collision, we can increase the target feature dimension, i.e., the number of buckets of the hash table. The default feature dimension is $2^{20}=1048576$
-\par By using tf-idf, we generate a vector for every plot description.
+\par By using TF-IDF, we generate a vector for every plot description.
 
 
 \subsection{Classification}
@@ -160,7 +159,7 @@ y_i(\mathbf{w}\cdot\mathbf{x}_i-b)\ge1
 
 \par As another experiment we combined all 3 features. Therefore we constructed a set of 3 feature vectors - one for plot, one for keywords and one for actors - per movie. Now we trained 3 SVMs per genre - one for each feature vector. In the testing phase we feed the feature vectors to the SVMs and build a simple average over the results of all 3 SVMs per genre. Cause we could only use movies which provide valid feature vectors for all 3 features, we could only use a dataset of 103536 movies.
 
-\par This experiment raised the question whether a combination of features really leads to an improved classification or if this is only an effect of higher quality data caused by a smaller subset of the data. To validate this we ran the single-feature approaches and two-feature combination approaches on the reduced subset of the data that provides all 3 features for every movie.
+\par This experiment raised the question whether a combination of features really leads to an improved classification or if this is only an effect of higher quality data caused by a smaller subset of the data. To validate this we ran the single-feature approaches and two-feature combination approaches on the reduced subset of the data that provides all 3 features for every movie. We trained the SVMs over 50 iterations for this experiment.
 
 \par See Figure \ref{fig:FeaturesAndGenresBarChart} for a comparison of the dataset sizes we were able to use for the different features.
 
