@@ -1,6 +1,9 @@
 \documentclass{vldb}
 \usepackage{graphicx}
 \usepackage{balance} 
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{mdframed}
 
 \begin{document}
 
@@ -28,17 +31,16 @@ IMDb is an online dataset which provides all kinds of information related to mov
 \par The dataset is organised into a set of compressed text files, where each file contains information on a specific aspect. The 4 main files we use are genres.list, plot.list, actors.list and keywords.list. The total size of the uncompressed files is about 1.7 GB. Although this is not big enough to be considered as 'Big Data', our approach is easy to adopted for larger data.
 
 
-\subsection{Tools & Languages}
+\subsection{Tools \& Languages}
 \par For our project the tools should meet the following requirements:
 \begin{itemize}
 \item {Easy and convinient way to preprocess the raw data to get formatted data}
 \item {Scalable data processing framwork with suited machine learning algorithms}
 \end{itemize}
-\par By comparing the advantages and disadvantaged, we decided to use these tools & languages:
+\par By comparing the advantages and disadvantaged, we decided to use these tools \& languages:
 \par Python: Python is a fast and friendly language. It's easy to learn, can work everywhere and it takes much less time to develop with it. Python is an excellent tool for scanning and manipulating textual data. The raw data from IMDb cannot be used directly, so we choose Python to do the preprocessing work and generate formatted data for the next steps. 
 \par Apache Spark \cite{spark}: Spark is an open source Apache project built around scaleability, speed and ease of use. It provides a fast and generic data processing platform. Spark enables us to quickly write applications in Java, Scala, or Python. It comes with a built-in set of over 80 high-level operators. Other than Spark Core API, there are additional libraries that are part of the Spark ecosystem and provide advanced capabilities for big data analytics and machine learning. The scalable machine learning library (MLlib) consists of common learning algorithms and utilities, including classification, regression, clustering, collaborative filtering, dimensionality reduction, as well as underlying optimisation primitives.
-\par TODO (Xi): Scala: Type inference, perfect for dataflow, immutability, functional style fits well with RDD/datafloe approach of Spark
-
+\par Scala: Scala is a programming language for general software applications. It has a built-in type inference mechanism which allows the programmer to omit certain type annotations. For instance, it is not necessary to specify the type of a variable, since the compiler can deduce the type from the initialization expression of the variable. The conciseness of Scala has a productivity benefit in allowing developers to do more functional work in a given workday. Additionaly, it is also a full-blown functional language. Except for the first-class functions, a library with efficient immutable data structures and a general preference of immutability over mutation are included in Scala. Most Scala data frameworks have the notion of some abstract data type that's extremely consistent with Scala's collection API. Similarly, RDD in Spark also have the same set of methods, e.g. map, flatMap, filter, reduce, fold and groupBy. One could just learn the standard collection and easily pick up one of the libraries. 
 \section{Methodology}
 
 \subsection{Approach}
@@ -61,7 +63,6 @@ IMDb is an online dataset which provides all kinds of information related to mov
 \par To get started, we had a look at the IMDb website itself. That way we could look at some random data points in a nicely formatted way and could evaluate which features we could use for our analysis and also how those features are structured. 
 \par After downloading the raw data we had a look at its format and could evaluate the size of the data.
 \par We used Tableau to get further insight of the dataset and see what genres we are dealing with. Figure \ref{fig:tableau} shows the distribution of all movie genres. We can easily see that Drama, Comedy and Documentary are the largest genres. This means for those 3 genres, there is much more input data to train the corresponding models. This might increase the classification accuracy. On the other hand, the large quantity means that the scope for those 3 genres is much larger, which means there are not so many common similarities inside each scope, leading to a decrease in accuracy.
-TODO(Xi): graph with larger labels
 \begin{figure}
 \begin{center}
 \includegraphics[width=3.00in]{genresContribution.png}
@@ -71,9 +72,34 @@ TODO(Xi): graph with larger labels
 \end{figure} 
 
 \subsection{Preprocessing}
-\par TODO (Xi): more detail about bad IMDB data; no csv; custom formats :( ; needed one line format for distributed computing (file splitting)
-\par Another part of the preprocessing is to scan the raw data and get the formatted data input for the Spark pipeline. This is done by small Python scripts and simple Scala programs.
-
+\par After downloading the data file from \url{ftp.fu-berlin.de}, we found that these files are formatted just to be difficult to use. There are no csv files and all the textual files are formatted in a general way:
+\begin{itemize}
+\item {CRC Line with file name and date}
+\item {Header data, sometimes instructions}
+\item {Header line (MOVIES LIST, etc.)}
+\item {Separator line, usually dashes}
+\item {Optionally more data and instructions}
+\end{itemize}
+The real data is between the head line and the seperator line and still not good formatted. For example, in plot.list, plot description is not a single line as we expected for the input of Spark pipeline, but split into several lines and begin with the notation "PL". So we need to scan and preprocess the raw data with small Python scripts and simple Scala programs. 
+\par The formatted data after the preprocessing is:
+\par Plot:
+\begin{mdframed}[backgroundcolor=lightgray,hidealllines=true]
+\begin{verbatim}
+MovieName|PlotDescription
+\end{verbatim}
+\end{mdframed}
+\par Actors:
+\begin{mdframed}[backgroundcolor=lightgray,hidealllines=true]
+\begin{verbatim}
+ActorName|MovieName
+\end{verbatim}
+\end{mdframed}
+\par Key words:
+\begin{mdframed}[backgroundcolor=lightgray,hidealllines=true]
+\begin{verbatim}
+MovieName|KeyWords
+\end{verbatim}
+\end{mdframed}
 
 \subsection{Apache Spark Pipeline}
 \par Spark ML\cite{sparkml} represents a workflow as a Pipeline, which consists of a sequence of PipelineStages (each stage is either a Transformer or an Estimator) to be run in a specific order. For Transformer stages, the transform() method is called on the dataset and the input dataset is modified as it passes through each stage. For Estimator stages, the fit() method is called to produce a Transformer (which becomes part of the PipelineModel, or fitted Pipeline), and that Transformer's transform() method is then called on the dataset.
